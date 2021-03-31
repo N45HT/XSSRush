@@ -26,6 +26,23 @@
     <img src="https://1.bp.blogspot.com/-Qgb0Fb9E3yU/YGScrg5XeeI/AAAAAAAABxQ/xP5YKu_LlbcNHsRj0v7HeF5gHRgTtgBXACLcBGAsYHQ/s1600/xssr-web.png" width="600">
   </li>
 </ul>
-<p>
-  📧 : contact@n45ht.or.id
-</p>
+<h4>Get in touch:</h4>
+<ul>
+  <li>
+    https://n45ht.or.id
+  </li>
+  <li>
+    <a href="mailto:contact@n45ht.or.id">contact@n45ht.or.id</a>
+  </li>
+  <li>
+    Bug report:
+    <ul>
+      <li>
+        https://hackerone.com/n45ht
+      </li>
+      <li>
+        https://n45ht.or.id/security
+      </li>
+    </ul>
+  </li>
+  </ul>
