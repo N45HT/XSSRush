@@ -8,10 +8,10 @@
 <a href="https://xssr.n45ht.or.id/scanner">https://xssr.n45ht.or.id/scanner</a>
 
 <h4>Chrome Extension:</h4>
-<a href="https://github.com/N45HTOfficial/XSSRush/tree/main/ChromeExtensions">https://github.com/N45HTOfficial/XSSRush/tree/main/ChromeExtensions</a>
+<a href="https://github.com/N45HT/XSSRush/tree/main/ChromeExtensions">https://github.com/N45HT/XSSRush/tree/main/ChromeExtensions</a>
 
 <h4>Windows App:</h4>
-<a href="https://github.com/N45HTOfficial/XSSRush/tree/main/WindowsApp">https://github.com/N45HTOfficial/XSSRush/tree/main/WindowsApp</a>
+<a href="https://github.com/N45HT/XSSRush/tree/main/WindowsApp">https://github.com/N45HT/XSSRush/tree/main/WindowsApp</a>
 
 <h4>Screenshot:</h4>
 <ul>
