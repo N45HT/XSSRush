@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<style>
+			html{
+				font-family: sans-serif;
+			}
+			body{
+				text-align:center;
+				font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+				color:#ffffff;
+				background-color:#1a2035;
+				line-height: 1.5em;
+			}
+			.bar{
+				width:99%;
+				height:60px;
+				margin:auto;
+				border:1px solid transparent;
+				background-color: #1f283e;
+				position:relative;
+				margin-bottom:
+			}
+			.container{
+				width:300px;
+				height:180px;
+				margin:auto;
+				border:1px solid transparent;
+			}
+			.row{
+				margin:30px 0px 30px 0px;
+			}
+			button{
+				padding: 10px 30px;
+				border:1px solid #da3a36;
+				color:#ffffff;
+				margin:2px;
+				background-color:#d22824;
+				cursor:pointer;
+				border-radius: 0.2rem;
+			}
+			button:hover{
+				border:1px solid #d22824;
+				background-color:#da3a36;
+			}
+			h4{
+				font-size: 1.125rem;
+				line-height: 1.4em;
+				font-weight: 300;
+				margin:5px 0px 0px 0px;
+			}
+			p.desc{
+				font-size: .875rem;
+				color: rgba(255, 255, 255, 0.8);
+				margin:0px 0px 5px 0px;
+			}
+			.footer{
+				font-size:11px;
+				text-decoration:underline;
+				margin-bottom:0px;
+			}
+			.footer img{
+				cursor:pointer;
+			}
+			hr{
+				position:absolute;
+				bottom:0;
+				left:0;
+				margin:0;
+				width:100%;
+				border:none;
+				height:1px;
+				color:#a9afbbd1;
+				background-color:#a9afbbd1;
+			}
+
+		</style>
+	</head>
+	<body id="body">
+		<div class="container">
+			<div class="bar">
+				<h4>XSSRush v2.0</h4>
+				<p class="desc">An automatic XSS scanner</p>
+				<hr>
+			</div>
+			<div class="row">
+				<button id="doXSS">Run XSSR</button>
+			</div>
+			<div class="footer" id="footer">
+				<img src="images/icon_16x16.png"/>
+			</div>
+		</div>
+		<script src="xssrush.js"></script>
+	</body>
+</html>
