@@ -1,7 +1,7 @@
 # XSSRush [beta]
 <h3 align="center">XSSRush: An automatic XSS scanner</h3>
 <p align="center">
-  <img src="ChromeExtensions/images/xssr-logo.png" width="200">
+  <img src="https://xssr.n45ht.or.id/assets/xssr-logo2.png" width="200">
 </p>
 <hr/>
 <h4>Web Based:</h4>
