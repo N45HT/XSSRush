@@ -1,4 +1,4 @@
-# XSSRush
+# XSSRush [beta]
 <h3 align="center">XSSRush: An automatic XSS scanner</h3>
 <p align="center">
   <img src="ChromeExtensions/images/xssr-logo.png" width="200">
@@ -8,17 +8,22 @@
 <a href="https://xssr.n45ht.or.id/scanner">https://xssr.n45ht.or.id/scanner</a>
 
 <h4>Chrome Extension:</h4>
-<a href="https://github.com/N45HT/XSSRush/tree/main/ChromeExtensions">https://github.com/N45HT/XSSRush/tree/main/ChromeExtensions</a>
+<a href="https://chromewebstore.google.com/detail/xssrush/genhilfmpfoefkgnnapfieabmaagdgkf">https://chromewebstore.google.com/detail/xssrush/genhilfmpfoefkgnnapfieabmaagdgkf</a>
 
-<h4>Windows App:</h4>
-<a href="https://github.com/N45HT/XSSRush/tree/main/WindowsApp">https://github.com/N45HT/XSSRush/tree/main/WindowsApp</a>
+<h4>Firefox Add-ons:</h4>
+<a href="https://addons.mozilla.org/en-US/firefox/addon/xssrush/">https://addons.mozilla.org/en-US/firefox/addon/xssrush/</a>
 
 <h4>Screenshot:</h4>
 <ul>
   <li>
     Chrome:
     <br>
-    <img src="https://1.bp.blogspot.com/-1NkgfcyQRlE/YGScrg4Gg3I/AAAAAAAABxU/0emPz1eAtkgjx3bvL5PcElijzNbzXiUDgCLcBGAsYHQ/s1600/xssr-chrome.png" width="300">
+    <img src="https://lh3.googleusercontent.com/pJAARjbmeq-nyM86WNeXZW5qKkIGgMlc_hbdwOvRWRnF7EwrNt28HrfaJY61x0kihIH9PthSa2j0kVTPR7Rr2OLh1VI=s800-w800-h500" width="300">
+  </li>
+  <li>
+    Firefox:
+    <br>
+    <img src="https://addons.mozilla.org/user-media/previews/full/306/306070.png?modified=1727754832" width="300">
   </li>
   <li>
     Web:
@@ -33,16 +38,5 @@
   </li>
   <li>
     <a href="mailto:contact@n45ht.or.id">contact@n45ht.or.id</a>
-  </li>
-  <li>
-    Bug report:
-    <ul>
-      <li>
-        https://hackerone.com/n45ht
-      </li>
-      <li>
-        https://n45ht.or.id/security
-      </li>
-    </ul>
   </li>
   </ul>
