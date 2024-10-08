@@ -34,9 +34,18 @@
 <h4>Get in touch:</h4>
 <ul>
   <li>
-    https://n45ht.or.id
+    Home: https://n45ht.or.id
   </li>
   <li>
-    <a href="mailto:contact@n45ht.or.id">contact@n45ht.or.id</a>
+    Email: <a href="mailto:contact@n45ht.or.id">contact@n45ht.or.id</a>
+  </li>
+  <li>
+    Terms of Service (ToS): https://xssr.n45ht.or.id/tos
+  </li>
+  <li>
+    User Agreement: https://xssr.n45ht.or.id/user-agreements
+  </li>
+  <li>
+    Privacy Policy: https://xssr.n45ht.or.id/privacy-policy
   </li>
   </ul>
