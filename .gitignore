@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+.playwright/
+ms-playwright/
+test-results/
+playwright-report/
+blob-report/
+output/*
+!output/.gitignore
