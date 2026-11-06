@@ -51,6 +51,8 @@ class ScannerEngine:
             self.logger.info(f"excluding parameter(s): {', '.join(self.config.exclude_params)}")
         if self.config.wordlist_path:
             self.logger.info(f"probing wordlist parameter(s): {self.config.wordlist_path} ({len(self.config.wordlist_params)} params)")
+        if self.config.mining_only:
+            self.logger.info("mining mode active: parameter discovery and reflection analysis only")
         self.logger.debug(f"scan scope modules: {', '.join(self.config.scan_modules)}")
 
         all_findings: List[XSSFinding] = []
@@ -106,6 +108,11 @@ class ScannerEngine:
             self.logger.debug(f"Step 0 complete: total {len(parameters)} parameter(s) registered")
 
             if not parameters:
+                if self.config.mining_only:
+                    self.logger.warning("no parameters discovered for mining")
+                    self.state.findings = []
+                    self.state.mark_completed()
+                    return [], []
                 self.logger.warning("no parameters discovered; checking path, fragment, and header vectors...")
             else:
                 self.state.current_step = 1
@@ -116,6 +123,12 @@ class ScannerEngine:
                     logger=self.logger,
                 )
                 self.logger.debug(f"Step 1 complete: reflections evaluated for {len(parameters)} parameter(s)")
+
+                if self.config.mining_only:
+                    self.state.findings = []
+                    self.state.mark_completed()
+                    self.logger.info(f"mining finished in {self.state.elapsed_seconds}s")
+                    return [], parameters
 
                 if "get" in self.config.scan_modules:
                     self.state.current_step = 2

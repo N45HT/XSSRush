@@ -76,6 +76,7 @@ class ScanConfig:
     exclude_headers: List[str] = field(default_factory=list)
     wordlist_path: Optional[str] = None
     wordlist_params: List[str] = field(default_factory=list)
+    mining_only: bool = False
 
 __all__ = [
     "ReflectionResult",

@@ -23,11 +23,13 @@ class Reporter:
         parameters: List[Parameter],
         logger: Optional[Any] = None,
         user_agent: Optional[str] = None,
+        mining_only: bool = False,
     ):
         self.findings = findings
         self.parameters = parameters
         self.logger = logger
         self.user_agent = user_agent or DEFAULT_USER_AGENT
+        self.mining_only = mining_only
 
     def _print_finding_item(self, idx: int, f: XSSFinding):
         param_str = f.param_name or "[Path/Hash]"
@@ -42,7 +44,37 @@ class Reporter:
         if f.proof_of_concept:
             print(f"      poc        : {CYAN}{f.proof_of_concept}{RESET}")
 
+    def print_mining_summary(self):
+        reflected_params = []
+        for p in self.parameters:
+            active_refs = [r for r in p.reflections if r.reflected]
+            if active_refs:
+                reflected_params.append((p, active_refs))
+
+        print(f"\n{BOLD}[*] parameter mining summary:{RESET}")
+        print(f"  total parameters discovered : {BOLD}{len(self.parameters)}{RESET}")
+        print(f"  reflected parameters        : {BOLD}{GREEN if reflected_params else RESET}{len(reflected_params)}{RESET}")
+
+        if not reflected_params:
+            print(f"\n[{BOLD}{YELLOW}!{RESET}] no reflected parameters found.\n")
+            return
+
+        print(f"\n{BOLD}{GREEN}[+] REFLECTED PARAMETERS:{RESET}")
+        for idx, (p, refs) in enumerate(reflected_params, 1):
+            print(f"  ({idx}) {BOLD}{WHITE}{p.param_name}{RESET} [{p.location}]")
+            print(f"      endpoint   : {p.action_url}")
+            contexts_str = []
+            for r in refs:
+                tag_str = f" (tag: <{r.tags}>)" if r.tags else ""
+                contexts_str.append(f"{r.context.upper()}{tag_str}")
+            print(f"      context    : {', '.join(contexts_str)}")
+        print()
+
     def print_summary(self):
+        if self.mining_only:
+            self.print_mining_summary()
+            return
+
         verified = [f for f in self.findings if f.xss == 1]
         matches = [f for f in self.findings if f.xss == 0 and f.xs_match == 1]
 
@@ -68,7 +100,10 @@ class Reporter:
         print()
 
     def render_console(self):
-        self.print_summary()
+        if self.mining_only:
+            self.print_mining_summary()
+        else:
+            self.print_summary()
 
     @staticmethod
     def _format_created_at(val: Any) -> str:
@@ -86,6 +121,42 @@ class Reporter:
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def export_json(self, filepath: str):
+        if self.mining_only:
+            reflected_data = []
+            for p in self.parameters:
+                active_refs = [r for r in p.reflections if r.reflected]
+                if not active_refs:
+                    continue
+                contexts = []
+                for r in active_refs:
+                    ctx_item = {
+                        "context": r.context,
+                        "method": r.request_method,
+                    }
+                    if r.tags:
+                        ctx_item["tag"] = r.tags
+                    contexts.append(ctx_item)
+                reflected_data.append({
+                    "parameter": p.param_name,
+                    "location": p.location,
+                    "endpoint": p.action_url,
+                    "contexts": contexts,
+                })
+
+            report = {
+                "scanner": "XSSR (XSSRush)",
+                "version": VERSION,
+                "github": GITHUB,
+                "mode": "parameter_mining",
+                "total_parameters_discovered": len(self.parameters),
+                "total_reflected_parameters": len(reflected_data),
+                "reflected_parameters": reflected_data,
+            }
+
+            with open(filepath, "w", encoding="utf-8") as file:
+                json.dump(report, file, indent=2)
+            return
+
         findings_data = []
         for f in self.findings:
             item = {

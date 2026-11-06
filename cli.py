@@ -229,6 +229,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Custom parameter wordlist file to probe (e.g. 'wordlists/common.txt')",
     )
     scope_group.add_argument(
+        "-m", "--mining",
+        dest="mining",
+        action="store_true",
+        default=False,
+        help="Perform parameter mining and reflection analysis only (no XSS testing)",
+    )
+    scope_group.add_argument(
         "-p", "--param",
         dest="param",
         action="append",
@@ -277,6 +284,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="HTTP headers to skip during header scan (comma-separated, e.g. 'User-Agent,Referer')",
     )
 
+    parser.add_argument(
+        "--parameter-mining",
+        dest="mining",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--mine",
+        dest="mining",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument(
         "--params",
         dest="param",
@@ -412,12 +431,13 @@ async def main_async(args):
         exclude_headers=exclude_headers,
         wordlist_path=resolved_wordlist,
         wordlist_params=wordlist_params,
+        mining_only=getattr(args, "mining", False),
     )
 
     engine = ScannerEngine(config=config, logger=logger)
     findings, parameters = await engine.run()
 
-    reporter = Reporter(findings=findings, parameters=parameters, logger=logger)
+    reporter = Reporter(findings=findings, parameters=parameters, logger=logger, mining_only=config.mining_only)
     reporter.render_console()
 
     if config.output_file:

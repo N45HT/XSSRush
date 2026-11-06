@@ -124,13 +124,19 @@ Probe hidden parameters using custom wordlists:
 python xssr.py -u "https://target.com/view" -w "wordlists/common.txt" --scan get,post
 ```
 
-### 8. Custom HTTP Headers Injection
+### 8. Parameter Mining & Reflection Probing Only
+Run parameter discovery and reflection context analysis without testing any XSS attack vectors:
+```bash
+python xssr.py -u "https://target.com/view" -m
+```
+
+### 9. Custom HTTP Headers Injection
 Audit specific HTTP headers alongside default targets:
 ```bash
 python xssr.py -u "https://target.com" --scan header --include-header "X-Client-IP,X-Custom-Auth"
 ```
 
-### 9. Inspect Built-in Knowledge Bases
+### 10. Inspect Built-in Knowledge Bases
 Inspect payloads, known parameter lists, or targeted headers and exit:
 ```bash
 python xssr.py --show-payloads
@@ -159,6 +165,8 @@ Scan Scope Options:
                                   (default: get,post)
   -w, --wordlist FILE             Custom parameter wordlist file to probe (e.g.
                                   'wordlists/common.txt')
+  -m, --mining                    Perform parameter mining and reflection analysis only (no XSS
+                                  testing)
   -p, --param PARAMS              Parameters to test (e.g. 'p:js,q:html' or 'name')
   -e, --exclude PARAMS            Parameters to skip during testing (comma-separated, e.g.
                                   'name,location')
