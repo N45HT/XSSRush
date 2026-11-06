@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xssrush"
+version = "2.0.0"
+description = "An Automated Multi-Vector Cross-Site Scripting (XSS) Scanner & Auditor"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "N45HT", email = "security@n45ht.or.id" }
+]
+keywords = [
+    "xss",
+    "xss-scanner",
+    "security",
+    "penetration-testing",
+    "vulnerability-scanner",
+    "playwright",
+    "bug-bounty",
+    "security-tools"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Security",
+]
+dependencies = [
+    "playwright>=1.40.0",
+    "beautifulsoup4>=4.12.0",
+    "rich>=13.7.0",
+    "urllib3>=2.0.0",
+]
+
+[project.urls]
+Homepage = "https://xssr.n45ht.or.id"
+Documentation = "https://github.com/N45HT/XSSRush#readme"
+Repository = "https://github.com/N45HT/XSSRush"
+Issues = "https://github.com/N45HT/XSSRush/issues"
+
+[project.scripts]
+xssrush = "cli:main"
+xssr = "cli:main"
+
+[tool.setuptools]
+py-modules = ["cli", "constants", "xssr"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "browser*",
+    "config*",
+    "detection*",
+    "models*",
+    "modules*",
+    "parsers*",
+    "payloads*",
+    "reporters*",
+    "scanner*",
+    "utils*",
+    "wordlists*",
+]
+exclude = ["output*", "tests*"]
+
+[tool.setuptools.package-data]
+wordlists = ["*.txt"]
