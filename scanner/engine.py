@@ -1,10 +1,11 @@
 from typing import Tuple, List, Optional
+from urllib.parse import urlparse
 import asyncio
 
 from models import ScanConfig, Parameter, XSSFinding
 from browser.playwright import BrowserManager
 from utils.logger import Logger
-from utils.helpers import is_valid_url
+from utils.helpers import is_valid_url, generate_random_string
 from scanner.state import ScanState
 
 from modules.parameter_mining import run_parameter_mining
@@ -33,6 +34,8 @@ class ScannerEngine:
 
         self.logger.info(f"target URL: {self.config.target_url}")
         self.logger.info(f"browser engine: {self.config.browser_type} (headless={self.config.headless})")
+        if self.config.target_params:
+            self.logger.info(f"target parameter(s): {', '.join(self.config.target_params)}")
         if self.config.exclude_params:
             self.logger.info(f"excluding parameter(s): {', '.join(self.config.exclude_params)}")
         if self.config.wordlist_path:
@@ -61,6 +64,25 @@ class ScannerEngine:
             if self.config.exclude_params:
                 exclude_set = set(p.lower() for p in self.config.exclude_params)
                 parameters = [p for p in parameters if p.param_name.lower() not in exclude_set]
+
+            if self.config.target_params:
+                target_set = set(p.lower() for p in self.config.target_params)
+                filtered = [p for p in parameters if p.param_name.lower() in target_set]
+                existing_names = {p.param_name.lower() for p in filtered}
+                exclude_set = set(p.lower() for p in self.config.exclude_params) if self.config.exclude_params else set()
+                for tp in self.config.target_params:
+                    if tp.lower() not in existing_names and tp.lower() not in exclude_set:
+                        parsed_base = urlparse(self.config.target_url)
+                        origin_path = f"{parsed_base.scheme}://{parsed_base.netloc}{parsed_base.path}"
+                        if not origin_path.endswith("/") and not parsed_base.path:
+                            origin_path += "/"
+                        filtered.append(Parameter(
+                            param_name=tp,
+                            param_value=generate_random_string(9),
+                            action_url=origin_path,
+                            location="GET",
+                        ))
+                parameters = filtered
 
             self.state.parameters = parameters
             self.logger.debug(f"Step 0 complete: total {len(parameters)} parameter(s) registered")

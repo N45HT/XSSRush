@@ -67,6 +67,7 @@ class ScanConfig:
     skip_headers: bool = False
     skip_paths: bool = False
     skip_fragments: bool = False
+    target_params: List[str] = field(default_factory=list)
     exclude_params: List[str] = field(default_factory=list)
     include_headers: List[str] = field(default_factory=list)
     exclude_headers: List[str] = field(default_factory=list)

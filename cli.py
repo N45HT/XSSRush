@@ -75,6 +75,19 @@ def parse_scan_modules(scan_str: Optional[str]) -> Set[str]:
 
     return selected if selected else {"get", "post"}
 
+def parse_target_params(param_arg) -> List[str]:
+    if not param_arg:
+        return []
+    res = []
+    if isinstance(param_arg, str):
+        param_arg = [param_arg]
+    for item in param_arg:
+        for p in item.split(","):
+            cleaned = p.strip()
+            if cleaned and cleaned.lower() not in [x.lower() for x in res]:
+                res.append(cleaned)
+    return res
+
 def parse_exclude_params(exclude_arg) -> List[str]:
     if not exclude_arg:
         return []
@@ -201,12 +214,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Custom parameter wordlist file to probe (e.g. 'wordlists/common.txt')",
     )
     scope_group.add_argument(
-        "-d", "--data",
-        dest="data",
-        type=str,
+        "-p", "--param",
+        dest="param",
+        action="append",
         default=None,
-        metavar="POSTFIELDS",
-        help="Custom POST data fields (e.g. 'username=admin&search=keyword')",
+        metavar="PARAMS",
+        help="Parameters to test (comma-separated, e.g. 'firstname,lastname')",
     )
     scope_group.add_argument(
         "-e", "--exclude",
@@ -215,6 +228,14 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="PARAMS",
         help="Parameters to skip during testing (comma-separated, e.g. 'name,location')",
+    )
+    scope_group.add_argument(
+        "-d", "--data",
+        dest="data",
+        type=str,
+        default=None,
+        metavar="POSTFIELDS",
+        help="Custom POST data fields (e.g. 'username=admin&search=keyword')",
     )
     scope_group.add_argument(
         "--include-header",
@@ -233,6 +254,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="HTTP headers to skip during header scan (comma-separated, e.g. 'User-Agent,Referer')",
     )
 
+    parser.add_argument(
+        "--params",
+        dest="param",
+        action="append",
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument(
         "--postfields",
         dest="data",
@@ -320,6 +347,7 @@ async def main_async(args):
     custom_postfields = parse_postfields_string(raw_data) if raw_data else None
     is_headless = str(args.headless).strip().lower() in ("true", "1", "yes")
     scan_modules = parse_scan_modules(args.scan)
+    target_params = parse_target_params(getattr(args, "param", None))
     exclude_params = parse_exclude_params(args.exclude)
     include_headers = parse_header_list(args.include_headers)
     exclude_headers = parse_header_list(args.exclude_headers)
@@ -352,6 +380,7 @@ async def main_async(args):
         verbose=args.verbose,
         output_file=resolved_output,
         scan_modules=scan_modules,
+        target_params=target_params,
         exclude_params=exclude_params,
         include_headers=include_headers,
         exclude_headers=exclude_headers,
