@@ -184,16 +184,27 @@ def detect_match(rendered_html: str, payload_data: Any) -> bool:
         expected = str(getattr(payload_data, "expected_value", ""))
         dialog_type = getattr(payload_data, "dialog_type", "alert").lower()
 
-        for s in soup.find_all("script"):
-            text = s.string or s.get_text() or ""
-            if dialog_type in text.lower() and (not expected or expected in text):
-                return True
+        injected_tags = {t.lower() for t in re.findall(r"<([a-zA-Z0-9]+)", payload_data.payload)}
 
-        for el in soup.find_all(True):
-            for attr_name, attr_val in el.attrs.items():
-                if attr_name.lower().startswith("on"):
-                    val = str(attr_val).lower()
-                    if dialog_type in val and (not expected or expected in val):
+        for tag_name in injected_tags:
+            for el in soup.find_all(tag_name):
+                if tag_name in ("img", "svg", "body", "iframe", "input", "button", "video", "audio", "details"):
+                    for attr_name, attr_val in el.attrs.items():
+                        if attr_name.lower().startswith("on"):
+                            val = str(attr_val).lower()
+                            if dialog_type in val and (not expected or expected in val):
+                                return True
+                elif tag_name == "script":
+                    has_matching_attr = any(
+                        attr.lower() in payload_data.payload.lower() for attr in el.attrs
+                    )
+                    text = el.string or el.get_text() or ""
+                    clean_lines = [
+                        line.strip() for line in text.splitlines()
+                        if not line.strip().startswith("//") and not line.strip().startswith("/*")
+                    ]
+                    clean_text = " ".join(clean_lines).lower()
+                    if (has_matching_attr or f"<{tag_name}" in payload_data.payload.lower()) and dialog_type in clean_text and (not expected or expected in clean_text):
                         return True
     except Exception:
         pass
