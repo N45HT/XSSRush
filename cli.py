@@ -3,7 +3,7 @@ import asyncio
 from pathlib import Path
 import re
 import sys
-from typing import Optional, Set, List
+from typing import Optional, Set, List, Dict, Tuple
 
 from constants import VERSION
 from models import ScanConfig
@@ -14,6 +14,7 @@ from scanner.engine import ScannerEngine
 from reporters.console import Reporter
 from payloads import get_all_payloads
 from config import GENERAL_PARAMS, REDIRECT_PARAMS, XSS_HEADERS
+from detection.context import normalize_context_name
 
 def strip_ansi(text: str) -> str:
     ansi_regex = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
@@ -75,18 +76,32 @@ def parse_scan_modules(scan_str: Optional[str]) -> Set[str]:
 
     return selected if selected else {"get", "post"}
 
-def parse_target_params(param_arg) -> List[str]:
+def parse_target_params(param_arg) -> Tuple[List[str], Dict[str, str]]:
     if not param_arg:
-        return []
-    res = []
+        return [], {}
+    params = []
+    contexts = {}
     if isinstance(param_arg, str):
         param_arg = [param_arg]
     for item in param_arg:
-        for p in item.split(","):
-            cleaned = p.strip()
-            if cleaned and cleaned.lower() not in [x.lower() for x in res]:
-                res.append(cleaned)
-    return res
+        for piece in item.split(","):
+            piece = piece.strip()
+            if not piece:
+                continue
+            if ":" in piece:
+                name, raw_ctx = piece.split(":", 1)
+                name = name.strip()
+                raw_ctx = raw_ctx.strip()
+                norm_ctx = normalize_context_name(raw_ctx)
+                if name:
+                    if name.lower() not in [x.lower() for x in params]:
+                        params.append(name)
+                    if norm_ctx:
+                        contexts[name.lower()] = norm_ctx
+            else:
+                if piece.lower() not in [x.lower() for x in params]:
+                    params.append(piece)
+    return params, contexts
 
 def parse_exclude_params(exclude_arg) -> List[str]:
     if not exclude_arg:
@@ -219,7 +234,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=None,
         metavar="PARAMS",
-        help="Parameters to test (comma-separated, e.g. 'firstname,lastname')",
+        help="Parameters to test (e.g. 'p:js,q:html' or 'name')",
     )
     scope_group.add_argument(
         "-e", "--exclude",
@@ -236,6 +251,14 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="POSTFIELDS",
         help="Custom POST data fields (e.g. 'username=admin&search=keyword')",
+    )
+    scope_group.add_argument(
+        "--context",
+        dest="context",
+        type=str,
+        default=None,
+        metavar="CONTEXT",
+        help="Default injection context (choices: js, html, attr, url, dom)",
     )
     scope_group.add_argument(
         "--include-header",
@@ -347,7 +370,8 @@ async def main_async(args):
     custom_postfields = parse_postfields_string(raw_data) if raw_data else None
     is_headless = str(args.headless).strip().lower() in ("true", "1", "yes")
     scan_modules = parse_scan_modules(args.scan)
-    target_params = parse_target_params(getattr(args, "param", None))
+    target_params, target_param_contexts = parse_target_params(getattr(args, "param", None))
+    default_context = normalize_context_name(getattr(args, "context", None))
     exclude_params = parse_exclude_params(args.exclude)
     include_headers = parse_header_list(args.include_headers)
     exclude_headers = parse_header_list(args.exclude_headers)
@@ -381,6 +405,8 @@ async def main_async(args):
         output_file=resolved_output,
         scan_modules=scan_modules,
         target_params=target_params,
+        target_param_contexts=target_param_contexts,
+        default_context=default_context,
         exclude_params=exclude_params,
         include_headers=include_headers,
         exclude_headers=exclude_headers,

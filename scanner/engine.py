@@ -35,7 +35,18 @@ class ScannerEngine:
         self.logger.info(f"target URL: {self.config.target_url}")
         self.logger.info(f"browser engine: {self.config.browser_type} (headless={self.config.headless})")
         if self.config.target_params:
-            self.logger.info(f"target parameter(s): {', '.join(self.config.target_params)}")
+            param_displays = []
+            for tp in self.config.target_params:
+                ctx = self.config.target_param_contexts.get(tp.lower())
+                if not ctx and self.config.default_context:
+                    ctx = self.config.default_context
+                if ctx:
+                    param_displays.append(f"{tp}:{ctx}")
+                else:
+                    param_displays.append(tp)
+            self.logger.info(f"target parameter(s): {', '.join(param_displays)}")
+        elif self.config.default_context:
+            self.logger.info(f"default context: {self.config.default_context}")
         if self.config.exclude_params:
             self.logger.info(f"excluding parameter(s): {', '.join(self.config.exclude_params)}")
         if self.config.wordlist_path:
@@ -83,6 +94,13 @@ class ScannerEngine:
                             location="GET",
                         ))
                 parameters = filtered
+
+            for p in parameters:
+                ctx = self.config.target_param_contexts.get(p.param_name.lower())
+                if not ctx and self.config.default_context:
+                    ctx = self.config.default_context
+                if ctx:
+                    p.custom_context = ctx
 
             self.state.parameters = parameters
             self.logger.debug(f"Step 0 complete: total {len(parameters)} parameter(s) registered")

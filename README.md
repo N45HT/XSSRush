@@ -159,10 +159,11 @@ Scan Scope Options:
                                   (default: get,post)
   -w, --wordlist FILE             Custom parameter wordlist file to probe (e.g.
                                   'wordlists/common.txt')
-  -p, --param PARAMS              Parameters to test (comma-separated, e.g. 'firstname,lastname')
+  -p, --param PARAMS              Parameters to test (e.g. 'p:js,q:html' or 'name')
   -e, --exclude PARAMS            Parameters to skip during testing (comma-separated, e.g.
                                   'name,location')
   -d, --data POSTFIELDS           Custom POST data fields (e.g. 'username=admin&search=keyword')
+  --context CONTEXT               Default injection context (choices: js, html, attr, url, dom)
   --include-header HEADERS        Custom HTTP headers to add to header scan (comma-separated, e.g.
                                   'X-User-Agent,X-Referer')
   --exclude-header HEADERS        HTTP headers to skip during header scan (comma-separated, e.g.

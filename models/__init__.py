@@ -25,6 +25,7 @@ class Parameter:
     location: str = "GET"
     action_url: str = ""
     tested: bool = False
+    custom_context: Optional[str] = None
     reflections: List[ReflectionResult] = field(default_factory=list)
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
 
@@ -68,6 +69,8 @@ class ScanConfig:
     skip_paths: bool = False
     skip_fragments: bool = False
     target_params: List[str] = field(default_factory=list)
+    target_param_contexts: Dict[str, str] = field(default_factory=dict)
+    default_context: Optional[str] = None
     exclude_params: List[str] = field(default_factory=list)
     include_headers: List[str] = field(default_factory=list)
     exclude_headers: List[str] = field(default_factory=list)

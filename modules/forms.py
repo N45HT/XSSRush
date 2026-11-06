@@ -44,11 +44,16 @@ async def run_post_based_xss(
                 continue
             tested_params.add(param_dedup_key)
 
-            context_name = "html"
-            if param.reflections:
+            if param.custom_context:
+                context_name = param.custom_context
+            elif param.reflections:
                 reflected_ctx = [r.context for r in param.reflections if r.reflected and r.context != "unknown"]
                 if reflected_ctx:
                     context_name = resolve_context_name(reflected_ctx[0], param.location)
+                else:
+                    context_name = "html"
+            else:
+                context_name = "html"
 
             payload_keys = get_payload_keys_for_context(context_name)
             if not payload_keys:
