@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import json
 from pathlib import Path
 import re
 import sys
@@ -268,6 +269,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="Custom POST data fields (e.g. 'username=admin&search=keyword')",
     )
     scope_group.add_argument(
+        "-c", "--cookie",
+        dest="cookie",
+        type=str,
+        default=None,
+        metavar="COOKIE",
+        help="Custom cookie string or path to cookie file (e.g. 'session=xyz')",
+    )
+    scope_group.add_argument(
+        "--cookie-file",
+        dest="cookie_file",
+        type=str,
+        default=None,
+        metavar="FILE",
+        help="Load cookies from file (Netscape, JSON, or key=value format)",
+    )
+    scope_group.add_argument(
+        "-H", "--header",
+        dest="headers",
+        action="append",
+        default=None,
+        metavar="HEADER",
+        help="Custom HTTP header to send with all requests (e.g. 'Authorization: Bearer token')",
+    )
+    scope_group.add_argument(
         "--context",
         dest="context",
         type=str,
@@ -302,6 +327,24 @@ def build_parser() -> argparse.ArgumentParser:
         "-q", "--quiet",
         dest="silent",
         action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--cookie-jar",
+        dest="cookie_file",
+        type=str,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--cookies",
+        dest="cookie",
+        type=str,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--headers",
+        dest="headers",
+        action="append",
         help=argparse.SUPPRESS,
     )
     parser.add_argument(
@@ -462,6 +505,120 @@ def normalize_target_url(raw: str) -> Optional[str]:
         return val
     return None
 
+def parse_custom_headers(raw_headers: Optional[List[str]]) -> Dict[str, str]:
+    headers: Dict[str, str] = {}
+    if not raw_headers:
+        return headers
+    for item in raw_headers:
+        for line in item.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if ":" in line:
+                k, v = line.split(":", 1)
+                headers[k.strip()] = v.strip()
+    return headers
+
+def parse_cookie_text(text: str, target_url: str) -> List[Dict[str, Any]]:
+    cookies: List[Dict[str, Any]] = []
+    text = text.strip()
+    if not text:
+        return cookies
+
+    if text.startswith("["):
+        try:
+            arr = json.loads(text)
+            if isinstance(arr, list):
+                for item in arr:
+                    if isinstance(item, dict) and "name" in item and "value" in item:
+                        c_dict = {
+                            "name": str(item["name"]),
+                            "value": str(item["value"]),
+                        }
+                        if "domain" in item:
+                            c_dict["domain"] = item["domain"]
+                        if "path" in item:
+                            c_dict["path"] = item["path"]
+                        if target_url and "domain" not in c_dict:
+                            c_dict["url"] = target_url
+                        cookies.append(c_dict)
+                return cookies
+        except Exception:
+            pass
+
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or (line.startswith("#") and not line.startswith("#HttpOnly_")):
+            continue
+        if line.startswith("#HttpOnly_"):
+            line = line[len("#HttpOnly_"):]
+        if "\t" in line:
+            parts = line.split("\t")
+            if len(parts) >= 7:
+                c_dict = {
+                    "name": parts[5].strip(),
+                    "value": parts[6].strip(),
+                }
+                dom = parts[0].strip()
+                if dom:
+                    c_dict["domain"] = dom
+                p_path = parts[2].strip()
+                if p_path:
+                    c_dict["path"] = p_path
+                if target_url and "domain" not in c_dict:
+                    c_dict["url"] = target_url
+                cookies.append(c_dict)
+                continue
+        for pair in line.split(";"):
+            pair = pair.strip()
+            if "=" in pair:
+                k, v = pair.split("=", 1)
+                c_dict = {
+                    "name": k.strip(),
+                    "value": v.strip(),
+                }
+                if target_url:
+                    c_dict["url"] = target_url
+                cookies.append(c_dict)
+
+    return cookies
+
+def load_cookies_config(raw_cookie: Optional[str], cookie_file: Optional[str], base_dir: Path, target_url: str) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    all_cookies: List[Dict[str, Any]] = []
+
+    if cookie_file:
+        p = Path(cookie_file.strip())
+        if not p.is_file():
+            alt = base_dir / cookie_file.strip()
+            if alt.is_file():
+                p = alt
+            else:
+                print(f"\033[97mxssr: error: cookie file not found: '{cookie_file}'\033[0m", file=sys.stderr)
+                sys.exit(2)
+        with open(p, "r", encoding="utf-8", errors="ignore") as f:
+            all_cookies.extend(parse_cookie_text(f.read(), target_url))
+
+    if raw_cookie:
+        val = raw_cookie.strip()
+        p = Path(val)
+        alt = base_dir / val
+        if p.is_file():
+            with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                all_cookies.extend(parse_cookie_text(f.read(), target_url))
+        elif alt.is_file():
+            with open(alt, "r", encoding="utf-8", errors="ignore") as f:
+                all_cookies.extend(parse_cookie_text(f.read(), target_url))
+        else:
+            all_cookies.extend(parse_cookie_text(val, target_url))
+
+    dedup: Dict[str, Dict[str, Any]] = {}
+    for c in all_cookies:
+        dedup[c["name"]] = c
+    final_cookies = list(dedup.values())
+
+    cookie_header_str = "; ".join(f"{c['name']}={c['value']}" for c in final_cookies) if final_cookies else None
+    return final_cookies, cookie_header_str
+
 async def main_async(args, raw_targets: List[str]):
     is_silent = getattr(args, "silent", False)
     logger = Logger(verbose=args.verbose, silent=is_silent)
@@ -480,6 +637,7 @@ async def main_async(args, raw_targets: List[str]):
             logger.error("no valid target URLs found to scan")
         sys.exit(1)
 
+    custom_headers = parse_custom_headers(getattr(args, "headers", None))
     raw_data = getattr(args, "data", None)
     custom_postfields = parse_postfields_string(raw_data) if raw_data else None
     is_headless = str(args.headless).strip().lower() in ("true", "1", "yes")
@@ -515,6 +673,16 @@ async def main_async(args, raw_targets: List[str]):
         if not is_silent and total_targets > 1:
             print(f"\n\033[1m\033[36m[*] target [{idx}/{total_targets}]: {target_url}\033[0m")
 
+        target_cookies, cookie_hdr = load_cookies_config(
+            raw_cookie=getattr(args, "cookie", None),
+            cookie_file=getattr(args, "cookie_file", None),
+            base_dir=base_dir,
+            target_url=target_url,
+        )
+        target_headers = dict(custom_headers)
+        if cookie_hdr and "Cookie" not in target_headers and "cookie" not in target_headers:
+            target_headers["Cookie"] = cookie_hdr
+
         config = ScanConfig(
             target_url=target_url,
             postfields=custom_postfields,
@@ -535,6 +703,9 @@ async def main_async(args, raw_targets: List[str]):
             wordlist_path=resolved_wordlist,
             wordlist_params=wordlist_params,
             mining_only=getattr(args, "mining", False),
+            headers=target_headers,
+            cookies=target_cookies,
+            cookie_string=cookie_hdr,
         )
 
         engine = ScannerEngine(config=config, logger=logger)

@@ -11,10 +11,14 @@ class BrowserManager:
         browser_type: str = "firefox",
         headless: bool = True,
         timeout_ms: int = 15000,
+        headers: Optional[Dict[str, str]] = None,
+        cookies: Optional[List[Dict[str, Any]]] = None,
     ):
         self.browser_type_name = browser_type.lower()
         self.headless = headless
         self.timeout_ms = timeout_ms
+        self.headers = dict(headers) if headers else {}
+        self.cookies = list(cookies) if cookies else []
 
         self.playwright: Optional[Playwright] = None
         self.browser: Optional[Browser] = None
@@ -41,15 +45,26 @@ class BrowserManager:
         if not self.browser:
             raise RuntimeError("Browser is not started. Call start() first.")
 
+        merged_headers = dict(self.headers)
+        if extra_headers:
+            merged_headers.update(extra_headers)
+
         context_kwargs: Dict[str, Any] = {
             "user_agent": custom_user_agent or DEFAULT_USER_AGENT,
             "ignore_https_errors": True,
         }
 
-        if extra_headers:
-            context_kwargs["extra_http_headers"] = extra_headers
+        if merged_headers:
+            context_kwargs["extra_http_headers"] = merged_headers
 
-        return await self.browser.new_context(**context_kwargs)
+        ctx = await self.browser.new_context(**context_kwargs)
+        if self.cookies:
+            try:
+                await ctx.add_cookies(self.cookies)
+            except Exception:
+                pass
+
+        return ctx
 
     async def create_page(
         self,

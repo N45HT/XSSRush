@@ -25,6 +25,8 @@ class ScannerEngine:
             browser_type=config.browser_type,
             headless=config.headless,
             timeout_ms=config.timeout_ms,
+            headers=config.headers,
+            cookies=config.cookies,
         )
 
     async def run(self) -> Tuple[List[XSSFinding], List[Parameter]]:
@@ -51,6 +53,12 @@ class ScannerEngine:
             self.logger.info(f"excluding parameter(s): {', '.join(self.config.exclude_params)}")
         if self.config.wordlist_path:
             self.logger.info(f"probing wordlist parameter(s): {self.config.wordlist_path} ({len(self.config.wordlist_params)} params)")
+        if self.config.headers:
+            h_names = [h for h in self.config.headers.keys() if h.lower() != "cookie"]
+            if h_names:
+                self.logger.info(f"custom HTTP header(s): {', '.join(h_names)}")
+        if self.config.cookies:
+            self.logger.info(f"custom cookie(s): {len(self.config.cookies)} cookie(s) loaded")
         if self.config.mining_only:
             self.logger.info("mining mode active: parameter discovery and reflection analysis only")
         self.logger.debug(f"scan scope modules: {', '.join(self.config.scan_modules)}")

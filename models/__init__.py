@@ -77,6 +77,9 @@ class ScanConfig:
     wordlist_path: Optional[str] = None
     wordlist_params: List[str] = field(default_factory=list)
     mining_only: bool = False
+    headers: Dict[str, str] = field(default_factory=dict)
+    cookies: List[Dict[str, Any]] = field(default_factory=list)
+    cookie_string: Optional[str] = None
 
 __all__ = [
     "ReflectionResult",

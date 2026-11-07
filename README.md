@@ -143,13 +143,24 @@ cat targets.txt | python xssr.py -s
 cat targets.txt | python xssr.py -s -m
 ```
 
-### 10. Custom HTTP Headers Injection
+### 10. Authenticated Scanning (Cookies & Custom Headers)
+Scan endpoints requiring session authentication or custom tokens:
+```bash
+# Pass cookies directly or via file
+python xssr.py -u "https://target.com/profile" -c "PHPSESSID=abc123xyz; role=admin"
+python xssr.py -u "https://target.com/profile" --cookie-file cookies.txt
+
+# Send custom HTTP headers (e.g. Bearer token, CSRF token)
+python xssr.py -u "https://target.com/api" -H "Authorization: Bearer my_jwt_token" -H "X-API-Key: secret"
+```
+
+### 11. Custom HTTP Headers Injection
 Audit specific HTTP headers alongside default targets:
 ```bash
 python xssr.py -u "https://target.com" --scan header --include-header "X-Client-IP,X-Custom-Auth"
 ```
 
-### 11. Inspect Built-in Knowledge Bases
+### 12. Inspect Built-in Knowledge Bases
 Inspect payloads, known parameter lists, or targeted headers and exit:
 ```bash
 python xssr.py --show-payloads
@@ -185,6 +196,10 @@ Scan Scope Options:
   -e, --exclude PARAMS            Parameters to skip during testing (comma-separated, e.g.
                                   'name,location')
   -d, --data POSTFIELDS           Custom POST data fields (e.g. 'username=admin&search=keyword')
+  -c, --cookie COOKIE             Custom cookie string or path to cookie file (e.g. 'session=xyz')
+  --cookie-file FILE              Load cookies from file (Netscape, JSON, or key=value format)
+  -H, --header HEADER             Custom HTTP header to send with all requests (e.g. 'Authorization:
+                                  Bearer token')
   --context CONTEXT               Default injection context (choices: js, html, attr, url, dom)
   --include-header HEADERS        Custom HTTP headers to add to header scan (comma-separated, e.g.
                                   'X-User-Agent,X-Referer')
