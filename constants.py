@@ -7,7 +7,9 @@ from config import (
     XSS_HEADERS,
 )
 
-BANNER = r"""
+VERSION = "2.0.6"
+
+BANNER = rf"""
  ___  ___   ________  ________  _______   
 |"  \/"  | /"       )/"       )/"      \  
  \   \  / (:   \___/(:   \___/|:        | 
@@ -15,6 +17,7 @@ BANNER = r"""
   /\.  \    __/  \\   __/  \\  //      /  
  /  \   \  /" \   :) /" \   :)|:  __   \  
 |___/\___|(_______/ (_______/ |__|  \___) 
+{f"v{VERSION}":>41}
 """
 
 APP = "XSSRush"
@@ -23,7 +26,6 @@ AUTHOR = "N45HT"
 HOMEPAGE = "https://n45ht.or.id"
 EMAIL = "security@n45ht.or.id"
 GITHUB = "https://github.com/N45HT/XSSRush"
-VERSION = "2.0.0"
 
 __all__ = [
     "BANNER",

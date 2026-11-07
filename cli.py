@@ -397,7 +397,7 @@ def build_parser() -> argparse.ArgumentParser:
     output_group.add_argument(
         "--version",
         action="version",
-        version="XSSR/XSSRush 2.0.0",
+        version=f"XSSR/XSSRush {VERSION}",
         help="Show program's version number and exit",
     )
 
