@@ -7,7 +7,7 @@ from config import (
     XSS_HEADERS,
 )
 
-VERSION = "2.0.6"
+VERSION = "2.0.7"
 
 BANNER = rf"""
  ___  ___   ________  ________  _______   
