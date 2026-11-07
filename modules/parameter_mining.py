@@ -511,7 +511,7 @@ async def run_parameter_mining(
         user_exclude_set = set(p.lower() for p in exclude_params)
         parameters = [p for p in parameters if p.param_name.lower() not in user_exclude_set]
 
-    if logger:
+    if logger and not getattr(logger, "silent", False):
         logger.info(f"parameter discovery completed: found {len(parameters)} parameter(s)")
         for p in parameters:
             loc_tag = f"[{p.location}]"

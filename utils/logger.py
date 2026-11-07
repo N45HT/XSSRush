@@ -35,11 +35,14 @@ def format_confidence(conf: float) -> str:
     return f"{color}{conf:.2f}{RESET}"
 
 class Logger:
-    def __init__(self, verbose: bool = False):
+    def __init__(self, verbose: bool = False, silent: bool = False):
         self.verbose = verbose
+        self.silent = silent
         self.current_param_group = None
 
     def print_banner(self):
+        if self.silent:
+            return
         banner_lines = BANNER.strip("\r\n").split("\n")
         indent_banner = " " * 18
         indent_sub = " " * 22
@@ -52,23 +55,33 @@ class Logger:
         print("\n\n")
 
     def info(self, message: str):
+        if self.silent:
+            return
         print(f"[*] {message}")
 
     def action(self, message: str):
+        if self.silent:
+            return
         self.current_param_group = None
         print(f"[*] {message}")
 
     def success(self, message: str):
+        if self.silent:
+            return
         print(f"{BOLD}{GREEN}[+]{RESET} {message}")
 
     def neutral(self, message: str):
+        if self.silent:
+            return
         print(f"{DIM}[-]{RESET} {message}")
 
     def warning(self, message: str):
+        if self.silent:
+            return
         print(f"{BOLD}{YELLOW}[!]{RESET} {message}")
 
     def error(self, message: str):
-        print(f"{BOLD}{RED}[-]{RESET} {message}")
+        print(f"{BOLD}{RED}[-]{RESET} {message}", file=sys.stderr)
 
     def critical(self, message: str):
         print(f"{BOLD}{RED}[CRITICAL]{RESET}")
@@ -79,6 +92,8 @@ class Logger:
         method: str,
         context: Optional[str] = None,
     ):
+        if self.silent:
+            return
         group_key = (param_name, method)
         if group_key == self.current_param_group:
             return
@@ -103,6 +118,20 @@ class Logger:
         postfields: Optional[str] = None,
         header_info: Optional[str] = None,
     ):
+        if self.silent:
+            if not is_xss and not is_match:
+                return
+
+            tag = f"{BOLD}{RED}[CRITICAL]{RESET}" if is_xss else f"{BOLD}{SOFT_ORANGE}[POTENTIAL]{RESET}"
+            extra = ""
+            if postfields:
+                extra = f" | Postfields: {postfields}"
+            elif header_info:
+                extra = f" | Header: {header_info}"
+
+            print(f"{tag} {request_desc}{extra}")
+            return
+
         if (param_name, method) != self.current_param_group:
             self.start_param_test(param_name, method, context)
 
@@ -157,5 +186,7 @@ class Logger:
         )
 
     def debug(self, message: str):
+        if self.silent:
+            return
         if self.verbose:
             print(f"{DIM}[DEBUG] {message}{RESET}")

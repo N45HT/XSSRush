@@ -130,13 +130,26 @@ Run parameter discovery and reflection context analysis without testing any XSS 
 python xssr.py -u "https://target.com/view" -m
 ```
 
-### 9. Custom HTTP Headers Injection
+### 9. Multi-Target Scanning & STDIN Pipeline
+Scan multiple targets from a file or directly via standard input pipes:
+```bash
+# Load targets from file
+python xssr.py -f targets.txt
+
+# Pipe from other tools or cat in silent mode
+cat targets.txt | python xssr.py -s
+
+# Silent mining mode
+cat targets.txt | python xssr.py -s -m
+```
+
+### 10. Custom HTTP Headers Injection
 Audit specific HTTP headers alongside default targets:
 ```bash
 python xssr.py -u "https://target.com" --scan header --include-header "X-Client-IP,X-Custom-Auth"
 ```
 
-### 10. Inspect Built-in Knowledge Bases
+### 11. Inspect Built-in Knowledge Bases
 Inspect payloads, known parameter lists, or targeted headers and exit:
 ```bash
 python xssr.py --show-payloads
@@ -151,6 +164,7 @@ python xssr.py --show-headers
 ```text
 Target Options:
   -u, --url URL                   Target URL to scan (e.g. https://example.com/search?q=test)
+  -f, --file FILE                 Load targets from file (one URL per line)
 
 Browser & Engine Options:
   -b, --browser {firefox,chromium,webkit}
@@ -185,6 +199,7 @@ Information Options:
 Output & Reporting Options:
   -o, --output FILE               Save report JSON (saved to output/ folder unless absolute path is
                                   given)
+  -s, --silent                    Silent mode (suppress banners and progress, output only findings)
   -v, --verbose                   Enable verbose debugging output
   -h, --help                      Show this help message and exit
   --version                       Show program's version number and exit

@@ -170,6 +170,14 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Target URL to scan (e.g. https://example.com/search?q=test)",
     )
+    target_group.add_argument(
+        "-f", "--file",
+        dest="file",
+        type=str,
+        default=None,
+        metavar="FILE",
+        help="Load targets from file (one URL per line)",
+    )
 
     browser_group = parser.add_argument_group("Browser & Engine Options")
     browser_group.add_argument(
@@ -285,6 +293,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "-l", "--list",
+        dest="file",
+        type=str,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "-q", "--quiet",
+        dest="silent",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         "--parameter-mining",
         dest="mining",
         action="store_true",
@@ -357,6 +377,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Save report JSON (saved to output/ folder unless absolute path is given)",
     )
     output_group.add_argument(
+        "-s", "--silent",
+        dest="silent",
+        action="store_true",
+        default=False,
+        help="Silent mode (suppress banners and progress, output only findings)",
+    )
+    output_group.add_argument(
         "-v", "--verbose",
         dest="verbose",
         action="store_true",
@@ -376,13 +403,81 @@ def build_parser() -> argparse.ArgumentParser:
 
     return parser
 
-async def main_async(args):
-    logger = Logger(verbose=args.verbose)
+def has_stdin_data() -> bool:
+    if sys.stdin is None or sys.stdin.isatty():
+        return False
+    if sys.platform == "win32":
+        try:
+            import msvcrt
+            import ctypes
+            from ctypes import wintypes
+            handle = msvcrt.get_osfhandle(sys.stdin.fileno())
+            avail = wintypes.DWORD()
+            res = ctypes.windll.kernel32.PeekNamedPipe(handle, None, 0, None, ctypes.byref(avail), None)
+            return bool(res and avail.value > 0)
+        except Exception:
+            return False
+    else:
+        try:
+            import select
+            return bool(select.select([sys.stdin], [], [], 0.0)[0])
+        except Exception:
+            return False
+
+def load_target_urls(args) -> List[str]:
+    raw_list: List[str] = []
+    if getattr(args, "url", None) and args.url.strip():
+        raw_list.append(args.url.strip())
+
+    file_val = getattr(args, "file", None)
+    if file_val:
+        p = Path(file_val.strip())
+        if not p.is_file():
+            print(f"\033[97mxssr: error: target file not found: '{file_val}'\033[0m", file=sys.stderr)
+            sys.exit(2)
+        with open(p, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                val = line.strip()
+                if val and not val.startswith("#"):
+                    raw_list.append(val)
+
+    if not raw_list and has_stdin_data():
+        try:
+            for line in sys.stdin:
+                val = line.strip()
+                if val and not val.startswith("#"):
+                    raw_list.append(val)
+        except Exception:
+            pass
+
+    return list(dict.fromkeys(raw_list))
+
+def normalize_target_url(raw: str) -> Optional[str]:
+    val = raw.strip()
+    if not val:
+        return None
+    if not val.startswith(("http://", "https://")):
+        val = f"http://{val}"
+    if is_valid_url(val):
+        return val
+    return None
+
+async def main_async(args, raw_targets: List[str]):
+    is_silent = getattr(args, "silent", False)
+    logger = Logger(verbose=args.verbose, silent=is_silent)
     logger.print_banner()
 
-    target_url = args.url.strip()
-    if not is_valid_url(target_url):
-        logger.error(f"invalid target URL: '{target_url}' (must begin with http:// or https://)")
+    valid_targets: List[str] = []
+    for raw in raw_targets:
+        norm = normalize_target_url(raw)
+        if norm:
+            valid_targets.append(norm)
+        elif not is_silent:
+            logger.warning(f"skipping invalid URL: '{raw}'")
+
+    if not valid_targets:
+        if not is_silent:
+            logger.error("no valid target URLs found to scan")
         sys.exit(1)
 
     raw_data = getattr(args, "data", None)
@@ -412,36 +507,59 @@ async def main_async(args):
         resolved_wordlist = str(wl_path)
         logger.info(f"loaded {len(wordlist_params)} parameter(s) from wordlist: '{args.wordlist}'")
 
-    config = ScanConfig(
-        target_url=target_url,
-        postfields=custom_postfields,
-        browser_type=args.browser,
-        headless=is_headless,
-        timeout_ms=args.timeout,
-        delay_min=args.delay_min,
-        delay_max=args.delay_max,
-        verbose=args.verbose,
-        output_file=resolved_output,
-        scan_modules=scan_modules,
-        target_params=target_params,
-        target_param_contexts=target_param_contexts,
-        default_context=default_context,
-        exclude_params=exclude_params,
-        include_headers=include_headers,
-        exclude_headers=exclude_headers,
-        wordlist_path=resolved_wordlist,
-        wordlist_params=wordlist_params,
-        mining_only=getattr(args, "mining", False),
-    )
+    total_targets = len(valid_targets)
+    all_findings = []
+    all_parameters = []
 
-    engine = ScannerEngine(config=config, logger=logger)
-    findings, parameters = await engine.run()
+    for idx, target_url in enumerate(valid_targets, 1):
+        if not is_silent and total_targets > 1:
+            print(f"\n\033[1m\033[36m[*] target [{idx}/{total_targets}]: {target_url}\033[0m")
 
-    reporter = Reporter(findings=findings, parameters=parameters, logger=logger, mining_only=config.mining_only)
-    reporter.render_console()
+        config = ScanConfig(
+            target_url=target_url,
+            postfields=custom_postfields,
+            browser_type=args.browser,
+            headless=is_headless,
+            timeout_ms=args.timeout,
+            delay_min=args.delay_min,
+            delay_max=args.delay_max,
+            verbose=args.verbose,
+            output_file=resolved_output,
+            scan_modules=scan_modules,
+            target_params=target_params,
+            target_param_contexts=target_param_contexts,
+            default_context=default_context,
+            exclude_params=exclude_params,
+            include_headers=include_headers,
+            exclude_headers=exclude_headers,
+            wordlist_path=resolved_wordlist,
+            wordlist_params=wordlist_params,
+            mining_only=getattr(args, "mining", False),
+        )
 
-    if config.output_file:
-        reporter.export_json(config.output_file)
+        engine = ScannerEngine(config=config, logger=logger)
+        findings, parameters = await engine.run()
+        all_findings.extend(findings)
+        all_parameters.extend(parameters)
+
+        if not is_silent and total_targets == 1:
+            reporter = Reporter(findings=findings, parameters=parameters, logger=logger, mining_only=config.mining_only, silent=is_silent)
+            reporter.render_console()
+        elif is_silent and config.mining_only:
+            for p in parameters:
+                for r in p.reflections:
+                    if r.reflected:
+                        tag_str = f", tag: <{r.tags}>" if r.tags else ""
+                        print(f"\033[1m\033[32m[REFLECTED]\033[0m [{p.location}] {p.action_url} -> '{p.param_name}' ({r.context.upper()}{tag_str})")
+
+    if not is_silent and total_targets > 1:
+        print(f"\n\033[1m\033[36m[*] multi-target scan summary ({total_targets} targets scanned):\033[0m")
+        reporter = Reporter(findings=all_findings, parameters=all_parameters, logger=logger, mining_only=getattr(args, "mining", False), silent=is_silent)
+        reporter.render_console()
+
+    if resolved_output:
+        reporter = Reporter(findings=all_findings, parameters=all_parameters, logger=logger, mining_only=getattr(args, "mining", False), silent=is_silent)
+        reporter.export_json(resolved_output)
 
 def handle_show_options(args) -> bool:
     has_show = False
@@ -466,11 +584,12 @@ def main():
     if handle_show_options(args):
         sys.exit(0)
 
-    if not args.url:
-        parser.error("the following arguments are required: -u/--url")
+    raw_targets = load_target_urls(args)
+    if not raw_targets:
+        parser.error("target URL is required via -u/--url, -f/--file, or standard input pipe")
 
     try:
-        asyncio.run(main_async(args))
+        asyncio.run(main_async(args, raw_targets))
     except KeyboardInterrupt:
         print("\n\033[1m\033[31m[!]\033[0m Scan interrupted by user.")
         sys.exit(130)

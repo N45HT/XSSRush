@@ -24,12 +24,14 @@ class Reporter:
         logger: Optional[Any] = None,
         user_agent: Optional[str] = None,
         mining_only: bool = False,
+        silent: bool = False,
     ):
         self.findings = findings
         self.parameters = parameters
         self.logger = logger
         self.user_agent = user_agent or DEFAULT_USER_AGENT
         self.mining_only = mining_only
+        self.silent = silent
 
     def _print_finding_item(self, idx: int, f: XSSFinding):
         param_str = f.param_name or "[Path/Hash]"
@@ -45,6 +47,9 @@ class Reporter:
             print(f"      poc        : {CYAN}{f.proof_of_concept}{RESET}")
 
     def print_mining_summary(self):
+        if self.silent:
+            return
+
         reflected_params = []
         for p in self.parameters:
             active_refs = [r for r in p.reflections if r.reflected]
@@ -71,6 +76,9 @@ class Reporter:
         print()
 
     def print_summary(self):
+        if self.silent:
+            return
+
         if self.mining_only:
             self.print_mining_summary()
             return
@@ -100,6 +108,8 @@ class Reporter:
         print()
 
     def render_console(self):
+        if self.silent:
+            return
         if self.mining_only:
             self.print_mining_summary()
         else:
