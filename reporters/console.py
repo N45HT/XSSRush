@@ -73,6 +73,19 @@ class Reporter:
                 tag_str = f" (tag: <{r.tags}>)" if r.tags else ""
                 contexts_str.append(f"{r.context.upper()}{tag_str}")
             print(f"      context    : {', '.join(contexts_str)}")
+            if p.char_matrix:
+                allowed = [ch for ch, s in p.char_matrix.items() if s == "allowed"]
+                escaped = [ch for ch, s in p.char_matrix.items() if s == "escaped"]
+                filtered = [ch for ch, s in p.char_matrix.items() if s == "filtered"]
+                parts = []
+                if allowed:
+                    parts.append(f"{GREEN}allowed: [ {' '.join(allowed)} ]{RESET}")
+                if escaped:
+                    parts.append(f"{YELLOW}escaped: [ {' '.join(escaped)} ]{RESET}")
+                if filtered:
+                    parts.append(f"{RED}filtered: [ {' '.join(filtered)} ]{RESET}")
+                if parts:
+                    print(f"      characters : {' | '.join(parts)}")
         print()
 
     def print_summary(self):
@@ -146,12 +159,15 @@ class Reporter:
                     if r.tags:
                         ctx_item["tag"] = r.tags
                     contexts.append(ctx_item)
-                reflected_data.append({
+                ref_item = {
                     "parameter": p.param_name,
                     "location": p.location,
                     "endpoint": p.action_url,
                     "contexts": contexts,
-                })
+                }
+                if p.char_matrix:
+                    ref_item["char_matrix"] = p.char_matrix
+                reflected_data.append(ref_item)
 
             report = {
                 "scanner": "XSSR (XSSRush)",
@@ -201,6 +217,7 @@ class Reporter:
                     "parameter": p.param_name,
                     "location": p.location,
                     "endpoint": p.action_url,
+                    **({"char_matrix": p.char_matrix} if p.char_matrix else {}),
                 }
                 for p in self.parameters
             ],

@@ -27,6 +27,7 @@ class Parameter:
     tested: bool = False
     custom_context: Optional[str] = None
     reflections: List[ReflectionResult] = field(default_factory=list)
+    char_matrix: Dict[str, str] = field(default_factory=dict)
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
 
 @dataclass

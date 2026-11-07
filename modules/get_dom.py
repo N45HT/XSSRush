@@ -14,6 +14,7 @@ async def run_get_dom_xss(
     parameters: List[Parameter],
     config: ScanConfig,
     logger: Optional[Logger] = None,
+    waf_manager: Optional[Any] = None,
 ) -> List[XSSFinding]:
     if logger:
         logger.action("testing for reflected XSS vulnerabilities (GET & DOM)...")
@@ -119,6 +120,9 @@ async def run_get_dom_xss(
                 rendered_html = await page.content()
                 if logger:
                     logger.debug(f"probe '{payload_data.name}' returned HTTP {status_code} ({len(rendered_html)} chars) in {elapsed_ms}ms")
+
+                if waf_manager and response:
+                    await waf_manager.handle_response(status_code, response_headers, rendered_html, config)
 
                 if not xs_scan and getattr(payload_data, "check_for_match", 1) == 1:
                     if detect_match(rendered_html, payload_data):

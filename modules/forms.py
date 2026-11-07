@@ -21,6 +21,7 @@ async def run_post_based_xss(
     parameters: List[Parameter],
     config: ScanConfig,
     logger: Optional[Logger] = None,
+    waf_manager: Optional[Any] = None,
 ) -> List[XSSFinding]:
     findings: List[XSSFinding] = []
     tested_payloads: Set[tuple] = set()
@@ -208,6 +209,10 @@ async def run_post_based_xss(
 
                     if logger:
                         logger.debug(f"POST execution returned ({len(rendered_html)} chars) in {elapsed_ms}ms")
+
+                    if waf_manager:
+                        status_code = nav_resp.status if nav_resp else 200
+                        await waf_manager.handle_response(status_code, response_headers, rendered_html, config)
 
                     if not xs_scan and getattr(payload_data, "check_for_match", 1) == 1:
                         if detect_match(rendered_html, payload_data):

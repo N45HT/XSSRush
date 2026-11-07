@@ -86,6 +86,26 @@ class Logger:
     def critical(self, message: str):
         print(f"{BOLD}{RED}[CRITICAL]{RESET}")
 
+    def char_matrix(self, param_name: str, matrix: Dict[str, str]):
+        if self.silent:
+            return
+        allowed = [ch for ch, s in matrix.items() if s == "allowed"]
+        escaped = [ch for ch, s in matrix.items() if s == "escaped"]
+        filtered = [ch for ch, s in matrix.items() if s == "filtered"]
+
+        parts = []
+        if allowed:
+            parts.append(f"{GREEN}allowed: [ {' '.join(allowed)} ]{RESET}")
+        if escaped:
+            parts.append(f"{YELLOW}escaped: [ {' '.join(escaped)} ]{RESET}")
+        if filtered:
+            parts.append(f"{RED}filtered: [ {' '.join(filtered)} ]{RESET}")
+
+        if not parts:
+            parts.append(f"{DIM}no reflection detected{RESET}")
+
+        print(f"  {SOFT_SLATE}[*] character matrix for '{param_name}': {' | '.join(parts)}{RESET}")
+
     def start_param_test(
         self,
         param_name: Optional[str],

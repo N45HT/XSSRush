@@ -19,6 +19,7 @@ async def run_fragment_based_xss(
     target_url: str,
     config: ScanConfig,
     logger: Optional[Logger] = None,
+    waf_manager: Optional[Any] = None,
 ) -> List[XSSFinding]:
     if logger:
         logger.action("testing URL fragment/hash vectors (#payload)...")
@@ -97,6 +98,9 @@ async def run_fragment_based_xss(
             rendered_html = await page.content()
             if logger:
                 logger.debug(f"fragment probe '{payload_data.name}' returned HTTP {status_code} ({len(rendered_html)} chars) in {elapsed_ms}ms")
+
+            if waf_manager and response:
+                await waf_manager.handle_response(status_code, response_headers, rendered_html, config)
 
             if not xs_scan and getattr(payload_data, "check_for_match", 1) == 1:
                 if detect_match(rendered_html, payload_data):

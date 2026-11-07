@@ -7,6 +7,7 @@ from browser.playwright import BrowserManager
 from utils.logger import Logger
 from utils.helpers import is_valid_url, generate_random_string
 from scanner.state import ScanState
+from detection.waf import WAFManager
 
 from modules.parameter_mining import run_parameter_mining
 from modules.reflection import run_reflection_engine
@@ -28,6 +29,7 @@ class ScannerEngine:
             headers=config.headers,
             cookies=config.cookies,
         )
+        self.waf_manager = WAFManager(logger=self.logger)
 
     async def run(self) -> Tuple[List[XSSFinding], List[Parameter]]:
         if not is_valid_url(self.config.target_url):
@@ -129,6 +131,8 @@ class ScannerEngine:
                     page=page,
                     parameters=parameters,
                     logger=self.logger,
+                    waf_manager=self.waf_manager,
+                    config=self.config,
                 )
                 self.logger.debug(f"Step 1 complete: reflections evaluated for {len(parameters)} parameter(s)")
 
@@ -146,6 +150,7 @@ class ScannerEngine:
                         parameters=parameters,
                         config=self.config,
                         logger=self.logger,
+                        waf_manager=self.waf_manager,
                     )
                     all_findings.extend(step2_findings)
                     self.logger.debug(f"Step 2 complete: {len(step2_findings)} finding(s)")
@@ -158,6 +163,7 @@ class ScannerEngine:
                         parameters=parameters,
                         config=self.config,
                         logger=self.logger,
+                        waf_manager=self.waf_manager,
                     )
                     all_findings.extend(step3_findings)
                     self.logger.debug(f"Step 3 complete: {len(step3_findings)} finding(s)")
@@ -170,6 +176,7 @@ class ScannerEngine:
                     target_url=self.config.target_url,
                     config=self.config,
                     logger=self.logger,
+                    waf_manager=self.waf_manager,
                 )
                 all_findings.extend(step4_findings)
                 self.logger.debug(f"Step 4 complete: {len(step4_findings)} finding(s)")
@@ -182,6 +189,7 @@ class ScannerEngine:
                     target_url=self.config.target_url,
                     config=self.config,
                     logger=self.logger,
+                    waf_manager=self.waf_manager,
                 )
                 all_findings.extend(step5_findings)
                 self.logger.debug(f"Step 5 complete: {len(step5_findings)} finding(s)")
@@ -194,6 +202,7 @@ class ScannerEngine:
                     target_url=self.config.target_url,
                     config=self.config,
                     logger=self.logger,
+                    waf_manager=self.waf_manager,
                 )
                 all_findings.extend(step6_findings)
                 self.logger.debug(f"Step 6 complete: {len(step6_findings)} finding(s)")

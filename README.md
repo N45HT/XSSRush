@@ -48,7 +48,7 @@ XSSR executes a structured 7-phase auditing sequence:
 | Step | Module | Attack Vector & Description |
 |:---:|---|---|
 | **0** | `modules/parameter_mining.py` | **Parameter Mining**: Extracts query params, form controls, global `window` JS variables, and probes hidden parameters using wordlists. |
-| **1** | `modules/reflection.py` | **Reflection Analysis**: Injects unique canary probe tokens to discover reflection points and maps syntactic contexts (`html`, `attribute`, `javascript`, `url`). |
+| **1** | `modules/reflection.py` | **Reflection Analysis & Character Probing**: Injects unique canary probe tokens to discover reflection points, maps syntactic contexts (`html`, `attribute`, `javascript`, `url`), and probes the **Special Character Reflection Matrix** (`' " < > / ; ( ) { } = ` `). |
 | **2** | `modules/get_dom.py` | **Reflected GET & DOM XSS**: Tests context-tuned payloads into query/DOM parameters and intercepts browser dialogs. |
 | **3** | `modules/forms.py` | **POST-Based Form XSS**: Automates DOM form submission (`requestSubmit()`) and generates base64 HTML reproduction PoCs. |
 | **4** | `modules/links.py` | **Path-Based XSS**: Injects payloads into URL path segments and directory rewrites. |
@@ -154,13 +154,25 @@ python xssr.py -u "https://target.com/profile" --cookie-file cookies.txt
 python xssr.py -u "https://target.com/api" -H "Authorization: Bearer my_jwt_token" -H "X-API-Key: secret"
 ```
 
-### 11. Custom HTTP Headers Injection
+### 11. Special Character Reflection Matrix & WAF / Rate-Limit Protection
+XSSR automatically probes critical XSS characters on reflected parameters (`' " < > / ; ( ) { } = ` `) in a single request, categorizing each character as `allowed`, `escaped`, or `filtered`. In addition, XSSR features built-in WAF (Cloudflare, AWS WAF, Akamai, Imperva, ModSecurity, Wordfence, Sucuri, F5) and rate-limit (HTTP 429) auto-detection, dynamically doubling delays and applying backoff throttling without failing:
+```bash
+# Character matrix output is displayed automatically on reflection analysis:
+python xssr.py -u "https://target.com/page?id=test" -m
+
+# Output preview:
+# [*] analyzing reflection and injection contexts for 1 parameter(s)...
+# [+] [GET] 'id' reflects in HTML context (tag: <body>)
+#   [*] character matrix for 'id': allowed: [ < > " ] | escaped: [ ' ] | filtered: [ ( ) { } = ]
+```
+
+### 12. Custom HTTP Headers Injection
 Audit specific HTTP headers alongside default targets:
 ```bash
 python xssr.py -u "https://target.com" --scan header --include-header "X-Client-IP,X-Custom-Auth"
 ```
 
-### 12. Inspect Built-in Knowledge Bases
+### 13. Inspect Built-in Knowledge Bases
 Inspect payloads, known parameter lists, or targeted headers and exit:
 ```bash
 python xssr.py --show-payloads
