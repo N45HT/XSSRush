@@ -166,13 +166,23 @@ python xssr.py -u "https://target.com/page?id=test" -m
 #   [*] character matrix for 'id': allowed: [ < > " ] | escaped: [ ' ] | filtered: [ ( ) { } = ]
 ```
 
-### 12. Custom HTTP Headers Injection
+### 12. Automated Crawler / Spider & Concurrency
+Automatically discover internal endpoints and forms while strictly deduplicating identical forms and endpoints across visited pages, then audit them in parallel using concurrent browser worker tabs:
+```bash
+# Crawl seed URL with depth 2 and test discovered endpoints concurrently using 3 browser tabs:
+python xssr.py -u "https://target.com" --crawl --depth 2 -t 3
+
+# Crawl with custom maximum URLs cap and parameter mining only:
+python xssr.py -u "https://target.com" --crawl --depth 3 --max-urls 100 -t 5 -m
+```
+
+### 13. Custom HTTP Headers Injection
 Audit specific HTTP headers alongside default targets:
 ```bash
 python xssr.py -u "https://target.com" --scan header --include-header "X-Client-IP,X-Custom-Auth"
 ```
 
-### 13. Inspect Built-in Knowledge Bases
+### 14. Inspect Built-in Knowledge Bases
 Inspect payloads, known parameter lists, or targeted headers and exit:
 ```bash
 python xssr.py --show-payloads
@@ -196,6 +206,8 @@ Browser & Engine Options:
   --timeout TIMEOUT               Page navigation timeout in milliseconds (default: 15000)
   --delay-min DELAY_MIN           Minimum request delay in ms (default: 3000)
   --delay-max DELAY_MAX           Maximum request delay in ms (default: 5000)
+  -t, --threads, --concurrency THREADS
+                                  Number of concurrent browser tabs/workers (1-5, default: 1)
 
 Scan Scope Options:
   --scan MODULES                  Modules to test: get, post, path, fragment, header, or all
@@ -217,6 +229,11 @@ Scan Scope Options:
                                   'X-User-Agent,X-Referer')
   --exclude-header HEADERS        HTTP headers to skip during header scan (comma-separated, e.g.
                                   'User-Agent,Referer')
+
+Crawler / Spider Options:
+  --crawl                         Enable internal spider/crawler to discover endpoints automatically
+  --depth DEPTH                   Maximum crawl depth for internal links (1-5, default: 2)
+  --max-urls MAX_URLS             Maximum total URLs to collect during crawling (1-200, default: 50)
 
 Information Options:
   --show-payloads                 Show all built-in XSS payloads and exit

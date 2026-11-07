@@ -16,6 +16,8 @@ from reporters.console import Reporter
 from payloads import get_all_payloads
 from config import GENERAL_PARAMS, REDIRECT_PARAMS, XSS_HEADERS
 from detection.context import normalize_context_name
+from browser.playwright import BrowserManager
+from modules.crawler import run_crawler, get_url_signature, get_form_signature
 
 def strip_ansi(text: str) -> str:
     ansi_regex = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
@@ -219,6 +221,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=5000,
         help="Maximum request delay in ms (default: 5000)",
     )
+    browser_group.add_argument(
+        "-t", "--threads", "--concurrency",
+        dest="threads",
+        type=int,
+        default=1,
+        help="Number of concurrent browser tabs/workers (1-5, default: 1)",
+    )
 
     scope_group = parser.add_argument_group("Scan Scope Options")
     scope_group.add_argument(
@@ -315,6 +324,29 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="HEADERS",
         help="HTTP headers to skip during header scan (comma-separated, e.g. 'User-Agent,Referer')",
+    )
+
+    crawl_group = parser.add_argument_group("Crawler / Spider Options")
+    crawl_group.add_argument(
+        "--crawl",
+        dest="crawl",
+        action="store_true",
+        default=False,
+        help="Enable internal spider/crawler to discover endpoints automatically",
+    )
+    crawl_group.add_argument(
+        "--depth",
+        dest="depth",
+        type=int,
+        default=2,
+        help="Maximum crawl depth for internal links (1-5, default: 2)",
+    )
+    crawl_group.add_argument(
+        "--max-urls",
+        dest="max_urls",
+        type=int,
+        default=50,
+        help="Maximum total URLs to collect during crawling (1-200, default: 50)",
     )
 
     parser.add_argument(
@@ -669,59 +701,205 @@ async def main_async(args, raw_targets: List[str]):
     all_findings = []
     all_parameters = []
 
-    for idx, target_url in enumerate(valid_targets, 1):
-        if not is_silent and total_targets > 1:
-            print(f"\n\033[1m\033[36m[*] target [{idx}/{total_targets}]: {target_url}\033[0m")
+    req_threads = getattr(args, "threads", 1) or 1
+    threads = min(max(1, req_threads), 5)
+    if req_threads > 5 and not is_silent:
+        logger.warning(f"thread count clamped to maximum 5 (requested: {req_threads})")
 
-        target_cookies, cookie_hdr = load_cookies_config(
-            raw_cookie=getattr(args, "cookie", None),
-            cookie_file=getattr(args, "cookie_file", None),
-            base_dir=base_dir,
-            target_url=target_url,
-        )
-        target_headers = dict(custom_headers)
-        if cookie_hdr and "Cookie" not in target_headers and "cookie" not in target_headers:
-            target_headers["Cookie"] = cookie_hdr
+    req_depth = getattr(args, "depth", 2) or 2
+    depth = min(max(1, req_depth), 5)
+    if req_depth > 5 and not is_silent:
+        logger.warning(f"crawl depth clamped to maximum 5 (requested: {req_depth})")
 
-        config = ScanConfig(
-            target_url=target_url,
-            postfields=custom_postfields,
+    req_max_urls = getattr(args, "max_urls", 50) or 50
+    max_urls = min(max(1, req_max_urls), 200)
+    if req_max_urls > 200 and not is_silent:
+        logger.warning(f"max-urls clamped to maximum 200 (requested: {req_max_urls})")
+
+    enable_crawl = getattr(args, "crawl", False)
+
+    scan_queue: List[Dict[str, Any]] = []
+    seen_url_signatures: Set[Tuple] = set()
+    seen_form_signatures: Set[Tuple] = set()
+
+    for u in valid_targets:
+        u_sig = get_url_signature(u)
+        seen_url_signatures.add(u_sig)
+        scan_queue.append({
+            "url": u,
+            "method": "POST" if custom_postfields else "GET",
+            "postfields": custom_postfields,
+        })
+
+    if enable_crawl:
+        crawl_bm = BrowserManager(
             browser_type=args.browser,
             headless=is_headless,
             timeout_ms=args.timeout,
-            delay_min=args.delay_min,
-            delay_max=args.delay_max,
-            verbose=args.verbose,
-            output_file=resolved_output,
-            scan_modules=scan_modules,
-            target_params=target_params,
-            target_param_contexts=target_param_contexts,
-            default_context=default_context,
-            exclude_params=exclude_params,
-            include_headers=include_headers,
-            exclude_headers=exclude_headers,
-            wordlist_path=resolved_wordlist,
-            wordlist_params=wordlist_params,
-            mining_only=getattr(args, "mining", False),
-            headers=target_headers,
-            cookies=target_cookies,
-            cookie_string=cookie_hdr,
+            headers=custom_headers,
         )
+        try:
+            await crawl_bm.start()
+            crawl_page = await crawl_bm.create_page()
+            for seed in valid_targets:
+                discovered = await run_crawler(
+                    page=crawl_page,
+                    seed_url=seed,
+                    max_depth=depth,
+                    max_urls=max_urls,
+                    logger=logger if not is_silent else None,
+                )
+                for item in discovered:
+                    if item["method"] == "POST":
+                        form_sig = get_form_signature("POST", item["url"], list((item.get("postfields") or {}).keys()))
+                        if form_sig not in seen_form_signatures:
+                            seen_form_signatures.add(form_sig)
+                            scan_queue.append(item)
+                    else:
+                        u_sig = get_url_signature(item["url"])
+                        if u_sig not in seen_url_signatures:
+                            seen_url_signatures.add(u_sig)
+                            scan_queue.append(item)
+        finally:
+            await crawl_bm.close()
 
-        engine = ScannerEngine(config=config, logger=logger)
-        findings, parameters = await engine.run()
-        all_findings.extend(findings)
-        all_parameters.extend(parameters)
+    total_targets = len(scan_queue)
 
-        if not is_silent and total_targets == 1:
-            reporter = Reporter(findings=findings, parameters=parameters, logger=logger, mining_only=config.mining_only, silent=is_silent)
-            reporter.render_console()
-        elif is_silent and config.mining_only:
-            for p in parameters:
-                for r in p.reflections:
-                    if r.reflected:
-                        tag_str = f", tag: <{r.tags}>" if r.tags else ""
-                        print(f"\033[1m\033[32m[REFLECTED]\033[0m [{p.location}] {p.action_url} -> '{p.param_name}' ({r.context.upper()}{tag_str})")
+    if threads > 1 and total_targets > 1:
+        if not is_silent:
+            logger.info(f"concurrency active: running {threads} parallel browser worker(s) across {total_targets} target(s)")
+
+        shared_bm = BrowserManager(
+            browser_type=args.browser,
+            headless=is_headless,
+            timeout_ms=args.timeout,
+            headers=custom_headers,
+        )
+        await shared_bm.start()
+        sem = asyncio.Semaphore(threads)
+
+        async def scan_item(idx: int, item: Dict[str, Any]):
+            target_url = item["url"]
+            t_postfields = item.get("postfields") or custom_postfields
+
+            target_cookies, cookie_hdr = load_cookies_config(
+                raw_cookie=getattr(args, "cookie", None),
+                cookie_file=getattr(args, "cookie_file", None),
+                base_dir=base_dir,
+                target_url=target_url,
+            )
+            target_headers = dict(custom_headers)
+            if cookie_hdr and "Cookie" not in target_headers and "cookie" not in target_headers:
+                target_headers["Cookie"] = cookie_hdr
+
+            cfg = ScanConfig(
+                target_url=target_url,
+                postfields=t_postfields,
+                browser_type=args.browser,
+                headless=is_headless,
+                timeout_ms=args.timeout,
+                delay_min=args.delay_min,
+                delay_max=args.delay_max,
+                verbose=args.verbose,
+                output_file=resolved_output,
+                scan_modules=scan_modules,
+                target_params=target_params,
+                target_param_contexts=target_param_contexts,
+                default_context=default_context,
+                exclude_params=exclude_params,
+                include_headers=include_headers,
+                exclude_headers=exclude_headers,
+                wordlist_path=resolved_wordlist,
+                wordlist_params=wordlist_params,
+                mining_only=getattr(args, "mining", False),
+                headers=target_headers,
+                cookies=target_cookies,
+                cookie_string=cookie_hdr,
+                threads=threads,
+                crawl=enable_crawl,
+                depth=depth,
+                max_urls=max_urls,
+            )
+
+            async with sem:
+                if not is_silent:
+                    print(f"\n\033[1m\033[36m[*] target [{idx}/{total_targets}]: {target_url}\033[0m")
+                worker_engine = ScannerEngine(config=cfg, logger=logger, browser_manager=shared_bm)
+                findings, parameters = await worker_engine.run()
+                all_findings.extend(findings)
+                all_parameters.extend(parameters)
+                if is_silent and cfg.mining_only:
+                    for p in parameters:
+                        for r in p.reflections:
+                            if r.reflected:
+                                tag_str = f", tag: <{r.tags}>" if r.tags else ""
+                                print(f"\033[1m\033[32m[REFLECTED]\033[0m [{p.location}] {p.action_url} -> '{p.param_name}' ({r.context.upper()}{tag_str})")
+
+        try:
+            tasks = [scan_item(idx, item) for idx, item in enumerate(scan_queue, 1)]
+            await asyncio.gather(*tasks)
+        finally:
+            await shared_bm.close()
+    else:
+        for idx, item in enumerate(scan_queue, 1):
+            target_url = item["url"]
+            t_postfields = item.get("postfields") or custom_postfields
+            if not is_silent and total_targets > 1:
+                print(f"\n\033[1m\033[36m[*] target [{idx}/{total_targets}]: {target_url}\033[0m")
+
+            target_cookies, cookie_hdr = load_cookies_config(
+                raw_cookie=getattr(args, "cookie", None),
+                cookie_file=getattr(args, "cookie_file", None),
+                base_dir=base_dir,
+                target_url=target_url,
+            )
+            target_headers = dict(custom_headers)
+            if cookie_hdr and "Cookie" not in target_headers and "cookie" not in target_headers:
+                target_headers["Cookie"] = cookie_hdr
+
+            config = ScanConfig(
+                target_url=target_url,
+                postfields=t_postfields,
+                browser_type=args.browser,
+                headless=is_headless,
+                timeout_ms=args.timeout,
+                delay_min=args.delay_min,
+                delay_max=args.delay_max,
+                verbose=args.verbose,
+                output_file=resolved_output,
+                scan_modules=scan_modules,
+                target_params=target_params,
+                target_param_contexts=target_param_contexts,
+                default_context=default_context,
+                exclude_params=exclude_params,
+                include_headers=include_headers,
+                exclude_headers=exclude_headers,
+                wordlist_path=resolved_wordlist,
+                wordlist_params=wordlist_params,
+                mining_only=getattr(args, "mining", False),
+                headers=target_headers,
+                cookies=target_cookies,
+                cookie_string=cookie_hdr,
+                threads=threads,
+                crawl=enable_crawl,
+                depth=depth,
+                max_urls=max_urls,
+            )
+
+            engine = ScannerEngine(config=config, logger=logger)
+            findings, parameters = await engine.run()
+            all_findings.extend(findings)
+            all_parameters.extend(parameters)
+
+            if not is_silent and total_targets == 1:
+                reporter = Reporter(findings=findings, parameters=parameters, logger=logger, mining_only=config.mining_only, silent=is_silent)
+                reporter.render_console()
+            elif is_silent and config.mining_only:
+                for p in parameters:
+                    for r in p.reflections:
+                        if r.reflected:
+                            tag_str = f", tag: <{r.tags}>" if r.tags else ""
+                            print(f"\033[1m\033[32m[REFLECTED]\033[0m [{p.location}] {p.action_url} -> '{p.param_name}' ({r.context.upper()}{tag_str})")
 
     if not is_silent and total_targets > 1:
         print(f"\n\033[1m\033[36m[*] multi-target scan summary ({total_targets} targets scanned):\033[0m")

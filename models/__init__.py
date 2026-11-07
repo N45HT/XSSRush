@@ -81,6 +81,10 @@ class ScanConfig:
     headers: Dict[str, str] = field(default_factory=dict)
     cookies: List[Dict[str, Any]] = field(default_factory=list)
     cookie_string: Optional[str] = None
+    threads: int = 1
+    crawl: bool = False
+    depth: int = 2
+    max_urls: int = 50
 
 __all__ = [
     "ReflectionResult",

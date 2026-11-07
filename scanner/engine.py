@@ -18,17 +18,25 @@ from modules.dom import run_fragment_based_xss
 from modules.headers import run_header_based_xss
 
 class ScannerEngine:
-    def __init__(self, config: ScanConfig, logger: Optional[Logger] = None):
+    def __init__(
+        self,
+        config: ScanConfig,
+        logger: Optional[Logger] = None,
+        browser_manager: Optional[BrowserManager] = None,
+        page=None,
+    ):
         self.config = config
         self.logger = logger or Logger(verbose=config.verbose)
         self.state = ScanState(target_url=config.target_url)
-        self.browser_manager = BrowserManager(
+        self.own_browser = (browser_manager is None)
+        self.browser_manager = browser_manager or BrowserManager(
             browser_type=config.browser_type,
             headless=config.headless,
             timeout_ms=config.timeout_ms,
             headers=config.headers,
             cookies=config.cookies,
         )
+        self.page = page
         self.waf_manager = WAFManager(logger=self.logger)
 
     async def run(self) -> Tuple[List[XSSFinding], List[Parameter]]:
@@ -67,11 +75,16 @@ class ScannerEngine:
 
         all_findings: List[XSSFinding] = []
         parameters: List[Parameter] = []
+        page = None
 
         try:
-            self.logger.debug(f"launching {self.config.browser_type} browser instance...")
-            await self.browser_manager.start()
-            page = await self.browser_manager.create_page()
+            if self.page:
+                page = self.page
+            else:
+                if self.own_browser:
+                    self.logger.debug(f"launching {self.config.browser_type} browser instance...")
+                    await self.browser_manager.start()
+                page = await self.browser_manager.create_page()
             self.logger.debug("browser instance ready, beginning Step 0 (parameter discovery)...")
 
             self.state.current_step = 0
@@ -215,7 +228,13 @@ class ScannerEngine:
         except Exception as err:
             self.logger.error(f"scanner engine encountered an unexpected error: {err}")
         finally:
-            self.logger.debug("closing browser resources...")
-            await self.browser_manager.close()
+            if not self.page and page:
+                try:
+                    await page.close()
+                except Exception:
+                    pass
+            if self.own_browser:
+                self.logger.debug("closing browser resources...")
+                await self.browser_manager.close()
 
         return all_findings, parameters
