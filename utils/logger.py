@@ -1,5 +1,5 @@
 import sys
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 from constants import BANNER, APP, DESCRIPTION, HOMEPAGE, EMAIL, VERSION
 
 RESET = "\033[0m"

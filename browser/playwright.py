@@ -1,5 +1,5 @@
 import asyncio
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, List
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page, Playwright
 from config import DEFAULT_USER_AGENT
 from utils.helpers import clean_error_text
