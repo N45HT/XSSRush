@@ -21,7 +21,7 @@ BANNER = rf"""
 """
 
 APP = "XSSRush"
-DESCRIPTION = "An Automatic XSS Scanner"
+DESCRIPTION = "Automated Multi-Vector XSS Scanner"
 AUTHOR = "N45HT"
 HOMEPAGE = "https://n45ht.or.id"
 EMAIL = "security@n45ht.or.id"

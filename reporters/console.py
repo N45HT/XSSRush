@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from typing import List, Optional, Any
 from models import XSSFinding, Parameter
-from utils.logger import format_confidence
+from utils.logger import format_confidence, format_payload_display
 from constants import VERSION, GITHUB
 from config import DEFAULT_USER_AGENT
 from utils.helpers import build_raw_http_request
@@ -41,7 +41,8 @@ class Reporter:
         if f.request_method.upper() == "POST" and f.request_body:
             print(f"      postfields : {f.request_body}")
         print(f"      context    : {f.context}")
-        print(f"      payload    : {BOLD}{WHITE}{f.payload_value}{RESET}")
+        clean_payload = format_payload_display(f.payload_value)
+        print(f"      payload    : {BOLD}{WHITE}{clean_payload}{RESET}")
         print(f"      confidence : {format_confidence(f.confidence)}")
         if f.proof_of_concept:
             print(f"      poc        : {CYAN}{f.proof_of_concept}{RESET}")

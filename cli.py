@@ -18,6 +18,7 @@ from config import GENERAL_PARAMS, REDIRECT_PARAMS, XSS_HEADERS
 from detection.context import normalize_context_name
 from browser.playwright import BrowserManager
 from modules.crawler import run_crawler, get_url_signature, get_form_signature
+from ai import resolve_ai_key
 
 def strip_ansi(text: str) -> str:
     ansi_regex = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
@@ -222,7 +223,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum request delay in ms (default: 5000)",
     )
     browser_group.add_argument(
-        "-t", "--threads", "--concurrency",
+        "-t", "--threads",
         dest="threads",
         type=int,
         default=1,
@@ -420,6 +421,38 @@ def build_parser() -> argparse.ArgumentParser:
         dest="show_params",
         action="store_true",
         help=argparse.SUPPRESS,
+    )
+
+    ai_group = parser.add_argument_group("AI Assistant Options")
+    ai_group.add_argument(
+        "--ai",
+        dest="ai",
+        action="store_true",
+        default=False,
+        help="Enable AI fallback analysis when standard payloads fail",
+    )
+    ai_group.add_argument(
+        "--ai-only",
+        dest="ai_only",
+        action="store_true",
+        default=False,
+        help="Exclusively test using AI-generated payloads (skip standard payloads)",
+    )
+    ai_group.add_argument(
+        "--ai-model",
+        dest="ai_model",
+        type=str,
+        default="deepseek/deepseek-chat",
+        metavar="MODEL",
+        help="AI model to use (default: deepseek/deepseek-chat)",
+    )
+    ai_group.add_argument(
+        "--ai-key",
+        dest="ai_key",
+        type=str,
+        default=None,
+        metavar="KEY",
+        help="AI provider API key (or via environment variable XSSR_AI_KEY)",
     )
 
     info_group = parser.add_argument_group("Information Options")
@@ -718,6 +751,23 @@ async def main_async(args, raw_targets: List[str]):
 
     enable_crawl = getattr(args, "crawl", False)
 
+    enable_ai_only = getattr(args, "ai_only", False)
+    enable_ai = getattr(args, "ai", False) or enable_ai_only
+    ai_key = None
+    if enable_ai:
+        ai_key = resolve_ai_key(getattr(args, "ai_key", None), base_dir)
+        if not ai_key:
+            enable_ai = False
+            enable_ai_only = False
+            if not is_silent:
+                logger.warning("AI features disabled: no API key found (provide --ai-key or set XSSR_AI_KEY in .env/environment)")
+        else:
+            if not is_silent:
+                if enable_ai_only:
+                    logger.info(f"AI-only testing active: provider=openrouter, model={args.ai_model} (skipping standard payloads)")
+                else:
+                    logger.info(f"AI fallback active: provider=openrouter, model={args.ai_model}")
+
     scan_queue: List[Dict[str, Any]] = []
     seen_url_signatures: Set[Tuple] = set()
     seen_form_signatures: Set[Tuple] = set()
@@ -819,6 +869,10 @@ async def main_async(args, raw_targets: List[str]):
                 crawl=enable_crawl,
                 depth=depth,
                 max_urls=max_urls,
+                ai_enabled=enable_ai,
+                ai_only=enable_ai_only,
+                ai_model=args.ai_model,
+                ai_key=ai_key,
             )
 
             async with sem:
@@ -884,6 +938,10 @@ async def main_async(args, raw_targets: List[str]):
                 crawl=enable_crawl,
                 depth=depth,
                 max_urls=max_urls,
+                ai_enabled=enable_ai,
+                ai_only=enable_ai_only,
+                ai_model=args.ai_model,
+                ai_key=ai_key,
             )
 
             engine = ScannerEngine(config=config, logger=logger)

@@ -8,6 +8,7 @@ from utils.logger import Logger
 from utils.helpers import is_valid_url, generate_random_string
 from scanner.state import ScanState
 from detection.waf import WAFManager
+from ai import AIAnalyzer
 
 from modules.parameter_mining import run_parameter_mining
 from modules.reflection import run_reflection_engine
@@ -38,6 +39,14 @@ class ScannerEngine:
         )
         self.page = page
         self.waf_manager = WAFManager(logger=self.logger)
+        if config.ai_enabled and config.ai_key:
+            self.ai_analyzer = AIAnalyzer(
+                api_key=config.ai_key,
+                model=config.ai_model,
+                logger=self.logger,
+            )
+        else:
+            self.ai_analyzer = None
 
     async def run(self) -> Tuple[List[XSSFinding], List[Parameter]]:
         if not is_valid_url(self.config.target_url):
@@ -164,6 +173,7 @@ class ScannerEngine:
                         config=self.config,
                         logger=self.logger,
                         waf_manager=self.waf_manager,
+                        ai_analyzer=self.ai_analyzer,
                     )
                     all_findings.extend(step2_findings)
                     self.logger.debug(f"Step 2 complete: {len(step2_findings)} finding(s)")
@@ -177,6 +187,7 @@ class ScannerEngine:
                         config=self.config,
                         logger=self.logger,
                         waf_manager=self.waf_manager,
+                        ai_analyzer=self.ai_analyzer,
                     )
                     all_findings.extend(step3_findings)
                     self.logger.debug(f"Step 3 complete: {len(step3_findings)} finding(s)")

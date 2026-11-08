@@ -85,6 +85,10 @@ class ScanConfig:
     crawl: bool = False
     depth: int = 2
     max_urls: int = 50
+    ai_enabled: bool = False
+    ai_only: bool = False
+    ai_model: str = "deepseek/deepseek-chat"
+    ai_key: Optional[str] = None
 
 __all__ = [
     "ReflectionResult",

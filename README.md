@@ -190,6 +190,20 @@ python xssr.py --show-params
 python xssr.py --show-headers
 ```
 
+### 15. AI Fallback Analyzer (LLM Filter Breakout)
+When a reflected parameter fails all standard rule-based and context payloads, XSSR can invoke an LLM fallback analyzer (via OpenRouter) to inspect the surrounding DOM snippet and character reflection matrix, construct tailored breakout payloads, and verify them automatically in the browser:
+```bash
+# Enable AI fallback with direct API key:
+python xssr.py -u "https://target.com/page?id=test" --ai --ai-key "31620e4f-..."
+
+# Or set environment variable XSSR_AI_KEY (or in .env):
+export XSSR_AI_KEY="sk-or-v1-..."
+python xssr.py -u "https://target.com/page?id=test" --ai --ai-model "deepseek/deepseek-chat"
+
+# Or run in AI-only mode (skip static payload lists, directly test AI-generated payloads):
+python xssr.py -u "https://target.com/page?id=test" --ai-only
+```
+
 ---
 
 ## Command Line Options
@@ -206,8 +220,7 @@ Browser & Engine Options:
   --timeout TIMEOUT               Page navigation timeout in milliseconds (default: 15000)
   --delay-min DELAY_MIN           Minimum request delay in ms (default: 3000)
   --delay-max DELAY_MAX           Maximum request delay in ms (default: 5000)
-  -t, --threads, --concurrency THREADS
-                                  Number of concurrent browser tabs/workers (1-5, default: 1)
+  -t, --threads THREADS           Number of concurrent browser tabs/workers (1-5, default: 1)
 
 Scan Scope Options:
   --scan MODULES                  Modules to test: get, post, path, fragment, header, or all
@@ -234,6 +247,12 @@ Crawler / Spider Options:
   --crawl                         Enable internal spider/crawler to discover endpoints automatically
   --depth DEPTH                   Maximum crawl depth for internal links (1-5, default: 2)
   --max-urls MAX_URLS             Maximum total URLs to collect during crawling (1-200, default: 50)
+
+AI Assistant Options:
+  --ai                            Enable AI fallback analysis when standard payloads fail
+  --ai-only                       Exclusively test using AI-generated payloads (skip standard payloads)
+  --ai-model MODEL                AI model to use (default: deepseek/deepseek-chat)
+  --ai-key KEY                    AI provider API key (or via environment variable XSSR_AI_KEY)
 
 Information Options:
   --show-payloads                 Show all built-in XSS payloads and exit

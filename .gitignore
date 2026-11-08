@@ -10,3 +10,4 @@ playwright-report/
 blob-report/
 output/*
 !output/.gitignore
+.env

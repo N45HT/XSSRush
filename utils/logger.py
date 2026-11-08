@@ -34,6 +34,11 @@ def format_confidence(conf: float) -> str:
 
     return f"{color}{conf:.2f}{RESET}"
 
+def format_payload_display(payload: Any) -> str:
+    if not payload:
+        return ""
+    return str(payload).replace("\r", "\\r").replace("\n", "\\n")
+
 class Logger:
     def __init__(self, verbose: bool = False, silent: bool = False):
         self.verbose = verbose
@@ -45,12 +50,13 @@ class Logger:
             return
         banner_lines = BANNER.strip("\r\n").split("\n")
         indent_banner = " " * 18
+        indent_desc = " " * 16
         indent_sub = " " * 22
 
         for line in banner_lines:
             print(f"{DARK_RED}{indent_banner}{line}{RESET}")
         print()
-        print(f"{PURE_WHITE}{indent_sub}{APP} - {DESCRIPTION}{RESET}")
+        print(f"{PURE_WHITE}{indent_desc}{APP} - {DESCRIPTION}{RESET}")
         print(f"{PURE_WHITE}{indent_sub}n45ht.or.id   security@n45ht.or.id{RESET}")
         print("\n\n")
 
@@ -166,7 +172,8 @@ class Logger:
         else:
             tag = f"{PURE_WHITE}[+]{RESET}"
 
-        print(f"  {tag} Payload    : {payload_name} ({YELLOW}{payload_str}{RESET})")
+        display_payload = format_payload_display(payload_str)
+        print(f"  {tag} Payload    : {payload_name} ({YELLOW}{display_payload}{RESET})")
         print(f"  {tag} Request    : {SOFT_SLATE}{request_desc}{RESET}")
         if postfields:
             print(f"  {tag} Postfields : {SOFT_SLATE}{postfields}{RESET}")
