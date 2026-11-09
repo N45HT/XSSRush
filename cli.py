@@ -188,9 +188,9 @@ def build_parser() -> argparse.ArgumentParser:
         "-b", "--browser",
         dest="browser",
         type=str,
-        choices=["firefox", "chromium", "webkit"],
+        choices=["firefox", "chromium", "webkit", "chrome", "msedge"],
         default="firefox",
-        help="Browser engine to use (default: firefox)",
+        help="Browser engine to use (default: firefox, choices: firefox, chromium, webkit, chrome, msedge)",
     )
     browser_group.add_argument(
         "--headless",

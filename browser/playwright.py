@@ -26,16 +26,37 @@ class BrowserManager:
     async def start(self):
         self.playwright = await async_playwright().start()
 
-        if self.browser_type_name == "chromium":
+        launch_kwargs = {"headless": self.headless}
+        if self.browser_type_name == "chrome":
+            engine = self.playwright.chromium
+            launch_kwargs["channel"] = "chrome"
+        elif self.browser_type_name in ("msedge", "edge"):
+            engine = self.playwright.chromium
+            launch_kwargs["channel"] = "msedge"
+        elif self.browser_type_name == "chromium":
             engine = self.playwright.chromium
         elif self.browser_type_name == "webkit":
             engine = self.playwright.webkit
         else:
             engine = self.playwright.firefox
 
-        self.browser = await engine.launch(
-            headless=self.headless,
-        )
+        try:
+            self.browser = await engine.launch(**launch_kwargs)
+        except Exception as e:
+            err_str = str(e).lower()
+            if "spawn unknown" in err_str or "application control" in err_str:
+                for fallback_channel in ("chrome", "msedge"):
+                    try:
+                        self.browser = await self.playwright.chromium.launch(
+                            headless=self.headless,
+                            channel=fallback_channel,
+                        )
+                        self.browser_type_name = fallback_channel
+                        break
+                    except Exception:
+                        continue
+            if not self.browser:
+                raise
 
     async def create_context(
         self,
