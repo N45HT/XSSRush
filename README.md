@@ -202,6 +202,9 @@ python xssr.py -u "https://target.com/page?id=test" --ai --ai-model "deepseek/de
 
 # Or run in AI-only mode (skip static payload lists, directly test AI-generated payloads):
 python xssr.py -u "https://target.com/page?id=test" --ai-only
+
+# Provide custom context hint for the AI analyzer:
+python xssr.py -u "https://target.com/page?id=test" --ai-only --ai-context "parameter is reflected inside script tag in variable in backtick"
 ```
 
 ---
@@ -253,6 +256,7 @@ AI Assistant Options:
   --ai-only                       Exclusively test using AI-generated payloads (skip standard payloads)
   --ai-model MODEL                AI model to use (default: deepseek/deepseek-chat)
   --ai-key KEY                    AI provider API key (or via environment variable XSSR_AI_KEY)
+  --ai-context HINT               Custom user-defined context hint or constraint for the AI analyzer
 
 Information Options:
   --show-payloads                 Show all built-in XSS payloads and exit

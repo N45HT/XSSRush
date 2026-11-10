@@ -49,6 +49,7 @@ async def run_header_based_xss(
     config: ScanConfig,
     logger: Optional[Logger] = None,
     waf_manager: Optional[Any] = None,
+    ai_analyzer: Optional[Any] = None,
 ) -> List[XSSFinding]:
     active_headers = build_target_headers(
         base_headers=XSS_HEADERS,
@@ -64,16 +65,21 @@ async def run_header_based_xss(
             logger.debug(f"custom excluded headers: {', '.join(config.exclude_headers)}")
 
     findings: List[XSSFinding] = []
+    is_ai_only = getattr(config, "ai_only", False)
     tested_headers: Set[tuple] = set()
 
     for header_name, contexts in active_headers.items():
         payload_keys = []
-        for ctx in contexts:
-            payload_keys.extend(XSSR_CONTEXT_MAP.get(ctx, []))
+        if not is_ai_only:
+            for ctx in contexts:
+                payload_keys.extend(XSSR_CONTEXT_MAP.get(ctx, []))
 
         if logger and payload_keys:
             logger.start_param_test(header_name, "HEADER", "http_header")
             logger.debug(f"queueing {len(payload_keys)} payload(s) for header '{header_name}'")
+        elif logger and is_ai_only:
+            logger.start_param_test(header_name, "HEADER", "http_header")
+            logger.debug(f"AI-only mode active: static header payloads skipped for '{header_name}'")
 
         for payload_key in payload_keys:
             test_key = (header_name.lower(), target_url.lower(), payload_key)
@@ -233,5 +239,134 @@ async def run_header_based_xss(
                 findings.append(finding)
 
             await async_delay(config.delay_min, config.delay_max)
+
+        has_verified_xss = any(f.param_name == header_name and f.xss == 1 for f in findings)
+        should_run_ai = (not has_verified_xss or is_ai_only) and ai_analyzer and getattr(config, "ai_enabled", False)
+        if should_run_ai:
+            if "rendered_html" in locals() and rendered_html:
+                last_html = rendered_html
+            else:
+                try:
+                    ctx = await browser_manager.create_context()
+                    p = await ctx.new_page()
+                    resp = await p.goto(target_url, wait_until="domcontentloaded", timeout=config.timeout_ms)
+                    last_html = await p.content()
+                    await ctx.close()
+                except Exception:
+                    last_html = ""
+
+            ai_payloads = await ai_analyzer.generate_bypass_payloads(
+                endpoint=target_url,
+                param_name=header_name,
+                location="HEADER",
+                context="header",
+                char_matrix={},
+                html=last_html,
+                reflected_token=header_name,
+                user_context=config.ai_context,
+            )
+            for ai_idx, ai_p in enumerate(ai_payloads, 1):
+                await async_delay(config.delay_min, config.delay_max)
+                extra_headers = {}
+                custom_ua = None
+                if header_name.lower() == "user-agent":
+                    custom_ua = ai_p
+                else:
+                    extra_headers[header_name] = ai_p
+
+                try:
+                    context = await browser_manager.create_context(
+                        extra_headers=extra_headers,
+                        custom_user_agent=custom_ua,
+                    )
+                except Exception as err:
+                    if logger:
+                        logger.debug(f"header context error for '{header_name}': {err}")
+                    continue
+
+                page = await context.new_page()
+                xs_scan = 0
+                text = ""
+                response_url = None
+                response_headers = None
+
+                async def handle_ai_dialog(dialog):
+                    nonlocal xs_scan
+                    xs_scan = 1
+                    try:
+                        await dialog.accept()
+                    except Exception:
+                        pass
+
+                page.on("dialog", handle_ai_dialog)
+                try:
+                    resp = await page.goto(
+                        target_url,
+                        wait_until="domcontentloaded",
+                        timeout=config.timeout_ms,
+                    )
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=1500)
+                    except Exception:
+                        pass
+                    await asyncio.sleep(0.5)
+                    response_url = page.url
+                    status_code = resp.status if resp else 0
+                    if resp:
+                        response_headers = await resp.all_headers()
+                        text = f"HTTP {resp.status} {resp.status_text}"
+                    r_html = await page.content()
+                    if waf_manager and resp:
+                        await waf_manager.handle_response(status_code, response_headers, r_html, config)
+                except Exception as err:
+                    text = clean_error_text(str(err))
+                finally:
+                    page.remove_listener("dialog", handle_ai_dialog)
+                    try:
+                        await context.close()
+                    except Exception:
+                        pass
+
+                final_xss = 1 if xs_scan else 0
+                final_conf = 10.0 if xs_scan else 0.0
+
+                p_label = f"AI Payload #{ai_idx} [{ai_analyzer.model}]" if is_ai_only else f"AI Bypass #{ai_idx} [{ai_analyzer.model}]"
+                if logger:
+                    logger.test_block(
+                        method="HEADER",
+                        param_name=header_name,
+                        context="http_header",
+                        payload_name=p_label,
+                        payload_str=ai_p,
+                        request_desc=f"GET {target_url}",
+                        header_info=f"{header_name}: {ai_p}",
+                        confidence=final_conf,
+                        dialog="alert('1')" if xs_scan else None,
+                        is_xss=bool(final_xss),
+                        is_match=False,
+                    )
+
+                if final_xss:
+                    findings.append(
+                        XSSFinding(
+                            endpoint=target_url,
+                            param_name=header_name,
+                            context="header_based",
+                            payload_name=p_label,
+                            payload_key=f"ai_{ai_idx}",
+                            payload_value=ai_p,
+                            request_method="HEADER",
+                            request_url=target_url,
+                            xss=1,
+                            confidence=final_conf,
+                            xs_scan=1,
+                            xs_match=0,
+                            response_url=response_url,
+                            response_headers=response_headers,
+                            text=text,
+                            created_at=get_current_time(),
+                            proof_of_concept=f"{header_name}: {ai_p}",
+                        )
+                    )
 
     return findings

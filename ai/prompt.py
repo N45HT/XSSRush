@@ -1,6 +1,6 @@
 import json
 import re
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 # Base scanning and breakout guidelines. Additional reflection contexts and custom rules can be added here.
 def build_system_prompt() -> str:
@@ -47,6 +47,7 @@ def build_system_prompt() -> str:
         "- If quotes (' and \") are filtered: use template backticks (alert(`xss`)), RegExp source (alert(/xss/.source)), or raw numbers (alert(1)).\n"
         "- If space (' ') is filtered: use '/' between HTML attributes (<svg/onload=alert(1)>) or tabs (%09) / newlines (%0A).\n"
         "- If dot ('.') is filtered: use bracket notation (window['alert'](1)).\n"
+        "- If 'user_provided_context_hint' is present in the input, prioritize this hint as trusted ground-truth regarding reflection syntax and environment constraints.\n"
         "\n"
         "Provide 1 to 3 minimal proof-of-concept test strings attempting to trigger alert(1), confirm(1), or alert`1` to verify boundary escape.\n"
         "Respond ONLY with a valid JSON object in the following format:\n"
@@ -65,6 +66,7 @@ def build_user_prompt(
     subcontext: str,
     char_matrix: Dict[str, str],
     snippet: str,
+    user_context: Optional[str] = None,
 ) -> str:
     allowed = [ch for ch, s in char_matrix.items() if s == "allowed"]
     escaped = [ch for ch, s in char_matrix.items() if s == "escaped"]
@@ -83,6 +85,8 @@ def build_user_prompt(
         },
         "surrounding_source_snippet": snippet.strip()[:800],
     }
+    if user_context and str(user_context).strip():
+        data["user_provided_context_hint"] = str(user_context).strip()
     return json.dumps(data, indent=2)
 
 def parse_ai_response(raw_response: str) -> Dict[str, Any]:

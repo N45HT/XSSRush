@@ -89,6 +89,7 @@ class ScanConfig:
     ai_only: bool = False
     ai_model: str = "deepseek/deepseek-chat"
     ai_key: Optional[str] = None
+    ai_context: Optional[str] = None
 
 __all__ = [
     "ReflectionResult",

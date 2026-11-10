@@ -311,6 +311,7 @@ async def run_post_based_xss(
                         char_matrix=param.char_matrix,
                         html=last_html,
                         reflected_token=last_token,
+                        user_context=config.ai_context,
                     )
                     for ai_idx, ai_p in enumerate(ai_payloads, 1):
                         await async_delay(config.delay_min, config.delay_max)

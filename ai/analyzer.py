@@ -41,11 +41,13 @@ class AIAnalyzer:
         model: str = "deepseek/deepseek-chat",
         logger: Optional[Logger] = None,
         provider: str = "openrouter",
+        user_context: Optional[str] = None,
     ):
         self.api_key = api_key
         self.model = model
         self.logger = logger
         self.provider = provider
+        self.user_context = user_context
         self.client = create_ai_client(provider, api_key, model) if api_key else None
         self._cache: Dict[str, Tuple[str, List[str]]] = {}
 
@@ -180,14 +182,16 @@ class AIAnalyzer:
         char_matrix: Dict[str, str],
         html: str,
         reflected_token: Optional[str] = None,
+        user_context: Optional[str] = None,
     ) -> List[str]:
         if not self.client or not self.api_key:
             return []
 
+        active_context_hint = user_context if user_context is not None else self.user_context
         needle = reflected_token or param_name
         snippet, subcontext = self.extract_snippet(html, needle)
         sorted_matrix = ",".join(f"{k}:{v}" for k, v in sorted(char_matrix.items()))
-        cache_key = f"{context}|{subcontext}|{sorted_matrix}"
+        cache_key = f"{context}|{subcontext}|{sorted_matrix}|{active_context_hint or ''}"
 
         if cache_key in self._cache:
             cached_analysis, cached_payloads = self._cache[cache_key]
@@ -211,6 +215,7 @@ class AIAnalyzer:
             subcontext=subcontext,
             char_matrix=char_matrix,
             snippet=snippet,
+            user_context=active_context_hint,
         )
 
         if self.logger:
@@ -218,6 +223,8 @@ class AIAnalyzer:
                 f"querying AI fallback ({self.model}) for '{param_name}' [{location}]..."
             )
             self.logger.debug(f"AI request subcontext: {subcontext} | snippet length: {len(snippet)} chars")
+            if active_context_hint:
+                self.logger.debug(f"AI user-defined context hint: {active_context_hint}")
 
         raw_resp, err_msg = await self.client.chat_completion(system_prompt, user_prompt)
         if err_msg:

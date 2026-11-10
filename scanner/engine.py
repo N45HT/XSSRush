@@ -44,6 +44,7 @@ class ScannerEngine:
                 api_key=config.ai_key,
                 model=config.ai_model,
                 logger=self.logger,
+                user_context=config.ai_context,
             )
         else:
             self.ai_analyzer = None
@@ -201,6 +202,7 @@ class ScannerEngine:
                     config=self.config,
                     logger=self.logger,
                     waf_manager=self.waf_manager,
+                    ai_analyzer=self.ai_analyzer,
                 )
                 all_findings.extend(step4_findings)
                 self.logger.debug(f"Step 4 complete: {len(step4_findings)} finding(s)")
@@ -214,6 +216,7 @@ class ScannerEngine:
                     config=self.config,
                     logger=self.logger,
                     waf_manager=self.waf_manager,
+                    ai_analyzer=self.ai_analyzer,
                 )
                 all_findings.extend(step5_findings)
                 self.logger.debug(f"Step 5 complete: {len(step5_findings)} finding(s)")
@@ -227,6 +230,7 @@ class ScannerEngine:
                     config=self.config,
                     logger=self.logger,
                     waf_manager=self.waf_manager,
+                    ai_analyzer=self.ai_analyzer,
                 )
                 all_findings.extend(step6_findings)
                 self.logger.debug(f"Step 6 complete: {len(step6_findings)} finding(s)")

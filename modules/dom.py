@@ -20,17 +20,22 @@ async def run_fragment_based_xss(
     config: ScanConfig,
     logger: Optional[Logger] = None,
     waf_manager: Optional[Any] = None,
+    ai_analyzer: Optional[Any] = None,
 ) -> List[XSSFinding]:
     if logger:
         logger.action("testing URL fragment/hash vectors (#payload)...")
 
     findings: List[XSSFinding] = []
-    payload_keys = XSSR_CONTEXT_MAP.get("fragment_based", [])
+    is_ai_only = getattr(config, "ai_only", False)
+    payload_keys = [] if is_ai_only else XSSR_CONTEXT_MAP.get("fragment_based", [])
     tested_fragments: Set[tuple] = set()
 
     if logger and payload_keys:
         logger.start_param_test("#hash", "FRAGMENT", "dom_fragment")
         logger.debug(f"queueing {len(payload_keys)} fragment payload(s) for {target_url}")
+    elif logger and is_ai_only:
+        logger.start_param_test("#hash", "FRAGMENT", "dom_fragment")
+        logger.debug(f"AI-only mode active: static fragment payloads skipped for {target_url}")
 
     for payload_key in payload_keys:
         test_key = (target_url.lower(), payload_key)
@@ -77,6 +82,11 @@ async def run_fragment_based_xss(
         t0 = time.perf_counter()
 
         try:
+            try:
+                await page.goto("about:blank")
+            except Exception:
+                pass
+
             response = await page.goto(
                 poc_url,
                 wait_until="domcontentloaded",
@@ -84,9 +94,11 @@ async def run_fragment_based_xss(
             )
 
             try:
-                await page.wait_for_load_state("networkidle", timeout=3000)
+                await page.wait_for_load_state("networkidle", timeout=1500)
             except Exception:
                 pass
+
+            await asyncio.sleep(0.5)
 
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
             response_url = page.url
@@ -167,5 +179,115 @@ async def run_fragment_based_xss(
             findings.append(finding)
 
         await async_delay(config.delay_min, config.delay_max)
+
+    has_verified_xss = any(f.param_name == "#hash" and f.xss == 1 for f in findings)
+    should_run_ai = (not has_verified_xss or is_ai_only) and ai_analyzer and getattr(config, "ai_enabled", False)
+    if should_run_ai:
+        if "rendered_html" in locals() and rendered_html:
+            last_html = rendered_html
+        else:
+            try:
+                resp = await page.goto(target_url, wait_until="domcontentloaded", timeout=config.timeout_ms)
+                last_html = await page.content()
+            except Exception:
+                last_html = ""
+
+        ai_payloads = await ai_analyzer.generate_bypass_payloads(
+            endpoint=target_url,
+            param_name="#hash",
+            location="FRAGMENT",
+            context="dom",
+            char_matrix={},
+            html=last_html,
+            reflected_token="location.hash",
+            user_context=config.ai_context,
+        )
+        for ai_idx, ai_p in enumerate(ai_payloads, 1):
+            await async_delay(config.delay_min, config.delay_max)
+            poc_url = build_fragment_payload_url(target_url, ai_p)
+            xs_scan = 0
+            text = ""
+            response_url = None
+            response_headers = None
+
+            async def handle_ai_dialog(dialog):
+                nonlocal xs_scan
+                xs_scan = 1
+                try:
+                    await dialog.accept()
+                except Exception:
+                    pass
+
+            page.on("dialog", handle_ai_dialog)
+            try:
+                try:
+                    await page.goto("about:blank")
+                except Exception:
+                    pass
+
+                resp = await page.goto(
+                    poc_url,
+                    wait_until="domcontentloaded",
+                    timeout=config.timeout_ms,
+                )
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=1500)
+                except Exception:
+                    pass
+
+                await asyncio.sleep(0.5)
+                response_url = page.url
+                status_code = resp.status if resp else 0
+                if resp:
+                    response_headers = await resp.all_headers()
+                    text = f"HTTP {resp.status} {resp.status_text}"
+                r_html = await page.content()
+                if waf_manager and resp:
+                    await waf_manager.handle_response(status_code, response_headers, r_html, config)
+            except Exception as err:
+                text = clean_error_text(str(err))
+            finally:
+                page.remove_listener("dialog", handle_ai_dialog)
+
+            final_xss = 1 if xs_scan else 0
+            final_conf = 10.0 if xs_scan else 0.0
+
+            p_label = f"AI Payload #{ai_idx} [{ai_analyzer.model}]" if is_ai_only else f"AI Bypass #{ai_idx} [{ai_analyzer.model}]"
+            if logger:
+                logger.test_block(
+                    method="FRAGMENT",
+                    param_name="#hash",
+                    context="dom_fragment",
+                    payload_name=p_label,
+                    payload_str=ai_p,
+                    request_desc=f"GET {poc_url}",
+                    confidence=final_conf,
+                    dialog="alert('1')" if xs_scan else None,
+                    is_xss=bool(final_xss),
+                    is_match=False,
+                )
+
+            if final_xss:
+                findings.append(
+                    XSSFinding(
+                        endpoint=target_url,
+                        param_name="#hash",
+                        context="fragment_based",
+                        payload_name=p_label,
+                        payload_key=f"ai_{ai_idx}",
+                        payload_value=ai_p,
+                        request_method="FRAGMENT",
+                        request_url=poc_url,
+                        xss=1,
+                        confidence=final_conf,
+                        xs_scan=1,
+                        xs_match=0,
+                        response_url=response_url,
+                        response_headers=response_headers,
+                        text=text,
+                        created_at=get_current_time(),
+                        proof_of_concept=poc_url,
+                    )
+                )
 
     return findings

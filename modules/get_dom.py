@@ -216,6 +216,7 @@ async def run_get_dom_xss(
                     char_matrix=param.char_matrix,
                     html=last_html,
                     reflected_token=last_token,
+                    user_context=config.ai_context,
                 )
                 for ai_idx, ai_p in enumerate(ai_payloads, 1):
                     await async_delay(config.delay_min, config.delay_max)
@@ -245,9 +246,10 @@ async def run_get_dom_xss(
                             timeout=config.timeout_ms,
                         )
                         try:
-                            await page.wait_for_load_state("networkidle", timeout=3000)
+                            await page.wait_for_load_state("networkidle", timeout=1500)
                         except Exception:
                             pass
+                        await asyncio.sleep(0.5)
                         response_url = page.url
                         status_code = resp.status if resp else 0
                         if resp:

@@ -454,6 +454,14 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="KEY",
         help="AI provider API key (or via environment variable XSSR_AI_KEY)",
     )
+    ai_group.add_argument(
+        "--ai-context",
+        dest="ai_context",
+        type=str,
+        default=None,
+        metavar="HINT",
+        help="Custom user-defined context hint or constraint for the AI analyzer (e.g. 'reflected inside backtick template literal')",
+    )
 
     info_group = parser.add_argument_group("Information Options")
     info_group.add_argument(
@@ -751,8 +759,9 @@ async def main_async(args, raw_targets: List[str]):
 
     enable_crawl = getattr(args, "crawl", False)
 
+    ai_context = getattr(args, "ai_context", None)
     enable_ai_only = getattr(args, "ai_only", False)
-    enable_ai = getattr(args, "ai", False) or enable_ai_only
+    enable_ai = getattr(args, "ai", False) or enable_ai_only or bool(ai_context)
     ai_key = None
     if enable_ai:
         ai_key = resolve_ai_key(getattr(args, "ai_key", None), base_dir)
@@ -767,6 +776,8 @@ async def main_async(args, raw_targets: List[str]):
                     logger.info(f"AI-only testing active: provider=openrouter, model={args.ai_model} (skipping standard payloads)")
                 else:
                     logger.info(f"AI fallback active: provider=openrouter, model={args.ai_model}")
+                if ai_context:
+                    logger.info(f"AI user context hint: {ai_context}")
 
     scan_queue: List[Dict[str, Any]] = []
     seen_url_signatures: Set[Tuple] = set()
@@ -873,6 +884,7 @@ async def main_async(args, raw_targets: List[str]):
                 ai_only=enable_ai_only,
                 ai_model=args.ai_model,
                 ai_key=ai_key,
+                ai_context=ai_context,
             )
 
             async with sem:
@@ -942,6 +954,7 @@ async def main_async(args, raw_targets: List[str]):
                 ai_only=enable_ai_only,
                 ai_model=args.ai_model,
                 ai_key=ai_key,
+                ai_context=ai_context,
             )
 
             engine = ScannerEngine(config=config, logger=logger)
